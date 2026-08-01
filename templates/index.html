@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelCompress - Image Compressor & Cropper PC</title>
+    <!-- Modern Font: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="dark-theme">
+
+    <!-- Top Application Bar -->
+    <header class="app-header">
+        <div class="brand">
+            <div class="logo-icon">
+                <i class="fa-solid fa-crop-simple"></i>
+            </div>
+            <div class="brand-text">
+                <h1>PixelCompress <span>PRO</span></h1>
+                <p>PC Image Compression & Cropping Suite</p>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn btn-secondary" id="btnOpenFile">
+                <i class="fa-solid fa-folder-open"></i> Open Image
+            </button>
+            <button class="btn btn-secondary" id="btnOpenBatch">
+                <i class="fa-solid fa-images"></i> Batch Mode
+            </button>
+            <button class="btn btn-primary" id="btnQuickSave" disabled>
+                <i class="fa-solid fa-floppy-disk"></i> Save Image
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="app-workspace">
+        
+        <!-- Left Sidebar Controls -->
+        <aside class="control-sidebar custom-scrollbar">
+            
+            <!-- Section 1: Crop & Aspect Ratio -->
+            <div class="control-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-vector-square"></i> Crop & Ratio</h3>
+                </div>
+                <div class="ratio-presets" id="ratioPresets">
+                    <button class="preset-btn active" data-ratio="free">Free</button>
+                    <button class="preset-btn" data-ratio="1:1">1:1 Sq</button>
+                    <button class="preset-btn" data-ratio="16:9">16:9 HD</button>
+                    <button class="preset-btn" data-ratio="4:3">4:3 Std</button>
+                    <button class="preset-btn" data-ratio="9:16">9:16 Reel</button>
+                    <button class="preset-btn" data-ratio="3:2">3:2 Photo</button>
+                </div>
+                
+                <div class="transform-actions">
+                    <button class="tool-btn" id="btnRotateLeft" title="Rotate Left (-90°)"><i class="fa-solid fa-rotate-left"></i></button>
+                    <button class="tool-btn" id="btnRotateRight" title="Rotate Right (+90°)"><i class="fa-solid fa-rotate-right"></i></button>
+                    <button class="tool-btn" id="btnFlipH" title="Flip Horizontal"><i class="fa-solid fa-arrows-left-right"></i></button>
+                    <button class="tool-btn" id="btnFlipV" title="Flip Vertical"><i class="fa-solid fa-arrows-up-down"></i></button>
+                    <button class="tool-btn" id="btnResetCrop" title="Reset Crop Box"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                </div>
+            </div>
+
+            <!-- Section 2: Scale & Dimension -->
+            <div class="control-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-ruler-combined"></i> Exact Dimensions</h3>
+                    <button class="tool-btn active-lock" id="btnLockAspect" title="Lock Aspect Ratio" style="width: auto; padding: 2px 8px; height: 26px; font-size: 0.75rem;">
+                        <i class="fa-solid fa-link" id="iconLock"></i> Lock
+                    </button>
+                </div>
+
+                <div class="dimension-inputs">
+                    <div class="input-group">
+                        <label>Width (px)</label>
+                        <input type="number" id="inputExactW" placeholder="Auto" min="1">
+                    </div>
+                    <div class="input-group">
+                        <label>Height (px)</label>
+                        <input type="number" id="inputExactH" placeholder="Auto" min="1">
+                    </div>
+                </div>
+
+                <!-- Dimension Resolution Quick Presets -->
+                <div class="target-presets" style="flex-wrap: wrap;">
+                    <button class="chip-btn dim-preset" data-w="1920" data-h="1080">1080p</button>
+                    <button class="chip-btn dim-preset" data-w="1280" data-h="720">720p</button>
+                    <button class="chip-btn dim-preset" data-w="1080" data-h="1080">1080² (IG)</button>
+                    <button class="chip-btn dim-preset" data-w="1080" data-h="1920">Story</button>
+                    <button class="chip-btn dim-preset" id="btnResetDim">Original</button>
+                </div>
+
+                <div class="card-header border-0 pb-0 mt-2">
+                    <label class="text-sm"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Scale %</label>
+                    <span class="value-badge" id="scaleValueBadge">100%</span>
+                </div>
+                <div class="range-container">
+                    <input type="range" id="scaleSlider" min="10" max="200" value="100" step="5">
+                </div>
+            </div>
+
+            <!-- Section 3: Compression Settings -->
+            <div class="control-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-file-zipper"></i> Compression & Format</h3>
+                </div>
+
+                <div class="form-group">
+                    <label>Output Format</label>
+                    <select id="selectFormat" class="custom-select">
+                        <option value="JPEG" selected>JPEG (.jpg)</option>
+                        <option value="WEBP">WebP (.webp)</option>
+                        <option value="PNG">PNG (.png)</option>
+                        <option value="BMP">BMP (.bmp)</option>
+                    </select>
+                </div>
+
+                <!-- Mode Switcher: Quality vs Target KB -->
+                <div class="compress-mode-toggle">
+                    <button class="mode-btn active" id="modeQuality">Quality Mode</button>
+                    <button class="mode-btn" id="modeTargetKB">Target Size Mode</button>
+                </div>
+
+                <!-- Quality Slider Container -->
+                <div class="mode-container" id="containerQuality">
+                    <div class="card-header border-0 pb-0">
+                        <label class="text-sm">Image Quality</label>
+                        <span class="value-badge highlight" id="qualityValueBadge">85%</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="qualitySlider" min="5" max="100" value="85" step="1">
+                    </div>
+                </div>
+
+                <!-- Target KB Input Container -->
+                <div class="mode-container hidden" id="containerTargetKB">
+                    <div class="input-group full-width">
+                        <label><i class="fa-solid fa-bullseye"></i> Max Target Size (KB)</label>
+                        <div class="target-kb-input-wrap">
+                            <input type="number" id="inputTargetKB" placeholder="e.g. 200" min="10" max="50000">
+                            <span>KB</span>
+                        </div>
+                    </div>
+                    <div class="target-presets">
+                        <button class="chip-btn" data-kb="100">100 KB</button>
+                        <button class="chip-btn" data-kb="200">200 KB</button>
+                        <button class="chip-btn" data-kb="500">500 KB</button>
+                        <button class="chip-btn" data-kb="1000">1 MB</button>
+                    </div>
+                </div>
+
+                <div class="switch-group">
+                    <label for="switchEXIF"><i class="fa-solid fa-shield-halved"></i> Preserve EXIF Metadata</label>
+                    <input type="checkbox" id="switchEXIF" class="custom-switch">
+                </div>
+
+            </div>
+
+        </aside>
+
+        <!-- Center Workspace Canvas Viewport -->
+        <section class="canvas-viewport">
+            
+            <!-- Viewport Controls & Comparison Switch -->
+            <div class="viewport-toolbar">
+                <div class="view-mode-selector">
+                    <button class="view-btn active" id="viewModeCrop"><i class="fa-solid fa-crop"></i> Edit & Crop</button>
+                    <button class="view-btn" id="viewModeCompare"><i class="fa-solid fa-table-columns"></i> Side-by-Side Split</button>
+                </div>
+
+                <div class="zoom-controls">
+                    <button class="zoom-btn" id="btnZoomOut" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
+                    <span id="zoomLevel">100%</span>
+                    <button class="zoom-btn" id="btnZoomIn" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
+                    <button class="zoom-btn" id="btnZoomReset" title="Reset Zoom"><i class="fa-solid fa-expand"></i></button>
+                </div>
+            </div>
+
+            <!-- Main Canvas / Drop Zone -->
+            <div class="canvas-container" id="canvasContainer">
+                
+                <!-- Drop Zone Overlay -->
+                <div class="drop-zone" id="dropZone">
+                    <div class="drop-content">
+                        <div class="drop-icon">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        </div>
+                        <h2>Drag & Drop Images Here</h2>
+                        <p>Supports JPEG, PNG, WebP, BMP, TIFF formats</p>
+                        <div class="drop-divider"><span>OR</span></div>
+                        <button class="btn btn-primary" id="btnBrowseDrop">
+                            <i class="fa-solid fa-file-image"></i> Browse Image File
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cropper Canvas Workspace -->
+                <div class="canvas-workspace hidden" id="canvasWorkspace">
+                    <canvas id="mainCanvas"></canvas>
+                    
+                    <!-- Crop Overlay Box -->
+                    <div class="crop-overlay-box" id="cropOverlay">
+                        <!-- Grid Lines -->
+                        <div class="crop-grid">
+                            <div class="grid-line h1"></div>
+                            <div class="grid-line h2"></div>
+                            <div class="grid-line v1"></div>
+                            <div class="grid-line v2"></div>
+                        </div>
+                        <!-- Resize Handles -->
+                        <div class="crop-handle handle-nw" data-handle="nw"></div>
+                        <div class="crop-handle handle-ne" data-handle="ne"></div>
+                        <div class="crop-handle handle-sw" data-handle="sw"></div>
+                        <div class="crop-handle handle-se" data-handle="se"></div>
+                        <div class="crop-handle handle-n" data-handle="n"></div>
+                        <div class="crop-handle handle-s" data-handle="s"></div>
+                        <div class="crop-handle handle-w" data-handle="w"></div>
+                        <div class="crop-handle handle-e" data-handle="e"></div>
+                    </div>
+                </div>
+
+                <!-- Side-by-Side Comparison Workspace -->
+                <div class="comparison-workspace hidden" id="comparisonWorkspace">
+                    <div class="comparison-container" id="comparisonContainer">
+                        <img id="imgBefore" alt="Original Image">
+                        <div class="after-wrapper" id="afterWrapper">
+                            <img id="imgAfter" alt="Compressed Output">
+                        </div>
+                        <div class="comparison-slider-bar" id="comparisonSliderBar">
+                            <div class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
+                        </div>
+                        <div class="comp-label label-before">ORIGINAL</div>
+                        <div class="comp-label label-after">PROCESSED</div>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- Right Side Stats & Actions Panel -->
+        <aside class="stats-panel custom-scrollbar">
+            
+            <div class="control-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-chart-pie"></i> Real-time Compression</h3>
+                </div>
+
+                <!-- Savings Banner -->
+                <div class="savings-card" id="savingsCard">
+                    <div class="savings-percent" id="savingsPercent">-0%</div>
+                    <div class="savings-subtext" id="savingsSubtext">Adjust settings to optimize</div>
+                </div>
+
+                <!-- Comparison Metrics Table -->
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <span class="metric-title">Original Size</span>
+                        <span class="metric-value" id="metricOrigSize">0 KB</span>
+                        <span class="metric-dim" id="metricOrigDim">0 x 0 px</span>
+                    </div>
+
+                    <div class="metric-box accent">
+                        <span class="metric-title">Compressed Output</span>
+                        <span class="metric-value" id="metricProcSize">0 KB</span>
+                        <span class="metric-dim" id="metricProcDim">0 x 0 px</span>
+                    </div>
+                </div>
+
+                <div class="details-list">
+                    <div class="detail-item">
+                        <span>Format</span>
+                        <span id="metricFormat" class="badge-tag">JPEG</span>
+                    </div>
+                    <div class="detail-item">
+                        <span>Quality / KB Target</span>
+                        <span id="metricQuality" class="badge-tag">85%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="control-card">
+                <button class="btn btn-success full-width" id="btnSaveToDisk" disabled>
+                    <i class="fa-solid fa-download"></i> Save Processed Image
+                </button>
+                
+                <button class="btn btn-secondary full-width mt-2" id="btnAddToBatch" disabled>
+                    <i class="fa-solid fa-layer-group"></i> Add to Batch Queue
+                </button>
+            </div>
+
+        </aside>
+
+    </main>
+
+    <!-- Bottom Batch Queue Drawer -->
+    <div class="batch-drawer collapsed" id="batchDrawer">
+        <div class="drawer-header" id="batchDrawerHeader">
+            <div class="drawer-title">
+                <i class="fa-solid fa-layer-group"></i> Batch Queue <span class="batch-count" id="batchCountBadge">0 files</span>
+            </div>
+            <div class="drawer-actions">
+                <button class="btn btn-sm btn-primary" id="btnProcessBatch" disabled>
+                    <i class="fa-solid fa-bolt"></i> Process All & Export ZIP
+                </button>
+                <button class="btn btn-sm btn-secondary" id="btnClearBatch">
+                    <i class="fa-solid fa-trash"></i> Clear
+                </button>
+                <button class="btn-icon" id="btnToggleDrawer">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="drawer-content custom-scrollbar" id="batchItemsContainer">
+            <div class="empty-batch-state">
+                <p>No files in batch queue. Open multiple files or add single images to process together.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="hiddenFileInput" accept="image/*" multiple style="display: none;">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="/static/js/cropper.js"></script>
+</body>
+</html>
