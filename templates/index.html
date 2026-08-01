@@ -68,6 +68,66 @@
                 </div>
             </div>
 
+            <!-- Section 1.5: Adjustments & Filters -->
+            <div class="control-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-sliders"></i> Adjustments</h3>
+                    <button class="tool-btn" id="btnResetAdjust" title="Reset Adjustments" style="width: auto; padding: 2px 8px; height: 26px; font-size: 0.75rem;">
+                        <i class="fa-solid fa-rotate-left"></i> Reset
+                    </button>
+                </div>
+
+                <div class="card-header border-0 pb-0">
+                    <label class="text-sm">Brightness</label>
+                    <span><input type="number" class="value-badge-input" id="brightnessValueBadge" value="100" min="0" max="200"><span class="value-badge-unit">%</span></span>
+                </div>
+                <div class="range-container">
+                    <input type="range" id="brightnessSlider" min="0" max="200" value="100" step="1">
+                </div>
+
+                <div class="card-header border-0 pb-0 mt-2">
+                    <label class="text-sm">Contrast</label>
+                    <span><input type="number" class="value-badge-input" id="contrastValueBadge" value="100" min="0" max="200"><span class="value-badge-unit">%</span></span>
+                </div>
+                <div class="range-container">
+                    <input type="range" id="contrastSlider" min="0" max="200" value="100" step="1">
+                </div>
+
+                <div class="card-header border-0 pb-0 mt-2">
+                    <label class="text-sm">Saturation</label>
+                    <span><input type="number" class="value-badge-input" id="saturationValueBadge" value="100" min="0" max="200"><span class="value-badge-unit">%</span></span>
+                </div>
+                <div class="range-container">
+                    <input type="range" id="saturationSlider" min="0" max="200" value="100" step="1">
+                </div>
+
+                <div class="card-header border-0 pb-0 mt-2">
+                    <label class="text-sm">Sharpness</label>
+                    <span><input type="number" class="value-badge-input" id="sharpnessValueBadge" value="100" min="0" max="200"><span class="value-badge-unit">%</span></span>
+                </div>
+                <div class="range-container">
+                    <input type="range" id="sharpnessSlider" min="0" max="200" value="100" step="1">
+                </div>
+
+                <div class="card-header border-0 pb-0 mt-2">
+                    <label class="text-sm">Blur</label>
+                    <span><input type="number" class="value-badge-input" id="blurValueBadge" value="0" min="0" max="20"><span class="value-badge-unit">px</span></span>
+                </div>
+                <div class="range-container">
+                    <input type="range" id="blurSlider" min="0" max="20" value="0" step="1">
+                </div>
+
+                <div class="card-header border-0 pb-0 mt-2">
+                    <label class="text-sm">Filter</label>
+                </div>
+                <div class="ratio-presets" id="filterPresets">
+                    <button class="preset-btn active" data-filter="none">None</button>
+                    <button class="preset-btn" data-filter="grayscale">Grayscale</button>
+                    <button class="preset-btn" data-filter="sepia">Sepia</button>
+                    <button class="preset-btn" data-filter="invert">Invert</button>
+                </div>
+            </div>
+
             <!-- Section 2: Scale & Dimension -->
             <div class="control-card">
                 <div class="card-header">

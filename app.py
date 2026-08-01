@@ -97,6 +97,14 @@ def api_process():
         target_kb = int(data['target_kb']) if data.get('target_kb') else None
         keep_exif = bool(data.get('keep_exif', False))
 
+        # Tier 1 adjustments
+        brightness = int(data.get('brightness', 100))
+        contrast = int(data.get('contrast', 100))
+        saturation = int(data.get('saturation', 100))
+        sharpness = int(data.get('sharpness', 100))
+        blur = int(data.get('blur', 0))
+        filter_type = str(data.get('filter_type', 'none'))
+
         result = image_engine.process_image_full(
             img_source=img_source,
             crop_box=crop_box,
@@ -111,7 +119,13 @@ def api_process():
             format=format_name,
             quality=quality,
             target_kb=target_kb,
-            keep_exif=keep_exif
+            keep_exif=keep_exif,
+            brightness=brightness,
+            contrast=contrast,
+            saturation=saturation,
+            sharpness=sharpness,
+            blur=blur,
+            filter_type=filter_type
         )
         return jsonify(result)
     except Exception as e:

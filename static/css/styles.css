@@ -249,6 +249,42 @@ body {
     border-color: var(--border-glow);
 }
 
+.value-badge-input {
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--bg-input);
+    padding: 2px 4px 2px 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 52px;
+    text-align: right;
+    font-family: inherit;
+}
+
+.value-badge-input:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+}
+
+/* Hide native spinner arrows for a cleaner badge look */
+.value-badge-input::-webkit-outer-spin-button,
+.value-badge-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.value-badge-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.value-badge-unit {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-left: -6px;
+}
+
 .range-container {
     padding: 4px 0;
 }

@@ -1,7 +1,7 @@
 import io
 import os
 import base64
-from PIL import Image, ImageOps, ImageEnhance
+from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
 def load_image(source):
     """
@@ -120,6 +120,61 @@ def transform_image(img, crop_box=None, rotate_angle=0, flip_h=False, flip_v=Fal
     return res_img
 
 
+def apply_adjustments(img, brightness=100, contrast=100, saturation=100, sharpness=100, blur=0, filter_type='none'):
+    """
+    Applies tonal/color adjustments and stylistic filters to a PIL image.
+    brightness/contrast/saturation/sharpness: 100 = no change, percentage-style sliders
+    blur: gaussian blur radius, 0 = none
+    filter_type: 'none' | 'grayscale' | 'sepia' | 'invert'
+    """
+    res_img = img
+
+    # 1. Brightness / Contrast / Saturation / Sharpness (only touch if changed, cheaper + avoids drift)
+    if brightness != 100:
+        res_img = ImageEnhance.Brightness(res_img).enhance(brightness / 100.0)
+    if contrast != 100:
+        res_img = ImageEnhance.Contrast(res_img).enhance(contrast / 100.0)
+    if saturation != 100:
+        res_img = ImageEnhance.Color(res_img).enhance(saturation / 100.0)
+    if sharpness != 100:
+        res_img = ImageEnhance.Sharpness(res_img).enhance(sharpness / 100.0)
+
+    # 2. Blur
+    if blur and blur > 0:
+        res_img = res_img.filter(ImageFilter.GaussianBlur(radius=blur))
+
+    # 3. Stylistic filter (grayscale / sepia / invert)
+    filter_type = (filter_type or 'none').lower()
+    if filter_type == 'grayscale':
+        was_rgba = res_img.mode == 'RGBA'
+        alpha = res_img.split()[-1] if was_rgba else None
+        gray = ImageOps.grayscale(res_img.convert('RGB'))
+        res_img = gray.convert('RGB')
+        if was_rgba:
+            res_img.putalpha(alpha)
+            res_img = res_img.convert('RGBA')
+    elif filter_type == 'sepia':
+        was_rgba = res_img.mode == 'RGBA'
+        alpha = res_img.split()[-1] if was_rgba else None
+        gray = ImageOps.grayscale(res_img.convert('RGB'))
+        # Classic sepia tone matrix applied via colorize
+        sepia_img = ImageOps.colorize(gray, black=(40, 26, 13), white=(255, 240, 192))
+        res_img = sepia_img.convert('RGB')
+        if was_rgba:
+            res_img.putalpha(alpha)
+            res_img = res_img.convert('RGBA')
+    elif filter_type == 'invert':
+        was_rgba = res_img.mode == 'RGBA'
+        alpha = res_img.split()[-1] if was_rgba else None
+        base = res_img.convert('RGB')
+        res_img = ImageOps.invert(base)
+        if was_rgba:
+            res_img.putalpha(alpha)
+            res_img = res_img.convert('RGBA')
+
+    return res_img
+
+
 def encode_image(img, format='JPEG', quality=85, keep_exif=False, original_img=None):
     """
     Encodes image to byte buffer in specified format (JPEG, PNG, WEBP, BMP, TIFF).
@@ -217,9 +272,9 @@ def compress_to_target_size(img, target_kb, format='JPEG', keep_exif=False):
     return encode_image(final_scaled, format=format, quality=5, keep_exif=keep_exif), 5, 10
 
 
-def process_image_full(img_source, crop_box=None, rotate_angle=0, flip_h=False, flip_v=False, scale_percent=100, max_w=None, max_h=None, exact_w=None, exact_h=None, format='JPEG', quality=85, target_kb=None, keep_exif=False):
+def process_image_full(img_source, crop_box=None, rotate_angle=0, flip_h=False, flip_v=False, scale_percent=100, max_w=None, max_h=None, exact_w=None, exact_h=None, format='JPEG', quality=85, target_kb=None, keep_exif=False, brightness=100, contrast=100, saturation=100, sharpness=100, blur=0, filter_type='none'):
     """
-    Complete pipeline: load -> transform -> compress/target_size -> metrics & base64 output.
+    Complete pipeline: load -> transform -> adjust/filter -> compress/target_size -> metrics & base64 output.
     """
     orig_img = load_image(img_source)
     orig_buf = io.BytesIO()
@@ -228,6 +283,7 @@ def process_image_full(img_source, crop_box=None, rotate_angle=0, flip_h=False, 
     orig_bytes = orig_buf.tell()
     
     transformed = transform_image(orig_img, crop_box, rotate_angle, flip_h, flip_v, scale_percent, max_w, max_h, exact_w, exact_h)
+    transformed = apply_adjustments(transformed, brightness, contrast, saturation, sharpness, blur, filter_type)
     
     achieved_quality = quality
     achieved_scale = scale_percent

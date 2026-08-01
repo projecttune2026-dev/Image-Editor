@@ -23,6 +23,14 @@ document.addEventListener('DOMContentLoaded', () => {
         exactW: null,
         exactH: null,
         lockAspect: true,
+
+        // Adjustments & Filters
+        brightness: 100,
+        contrast: 100,
+        saturation: 100,
+        sharpness: 100,
+        blur: 0,
+        filterType: 'none',
         
         // Compression
         format: 'JPEG',
@@ -73,6 +81,19 @@ document.addEventListener('DOMContentLoaded', () => {
         btnLockAspect: document.getElementById('btnLockAspect'),
         iconLock: document.getElementById('iconLock'),
         btnResetDim: document.getElementById('btnResetDim'),
+
+        brightnessSlider: document.getElementById('brightnessSlider'),
+        brightnessValueBadge: document.getElementById('brightnessValueBadge'),
+        contrastSlider: document.getElementById('contrastSlider'),
+        contrastValueBadge: document.getElementById('contrastValueBadge'),
+        saturationSlider: document.getElementById('saturationSlider'),
+        saturationValueBadge: document.getElementById('saturationValueBadge'),
+        sharpnessSlider: document.getElementById('sharpnessSlider'),
+        sharpnessValueBadge: document.getElementById('sharpnessValueBadge'),
+        blurSlider: document.getElementById('blurSlider'),
+        blurValueBadge: document.getElementById('blurValueBadge'),
+        filterPresets: document.getElementById('filterPresets'),
+        btnResetAdjust: document.getElementById('btnResetAdjust'),
         
         selectFormat: document.getElementById('selectFormat'),
         modeQuality: document.getElementById('modeQuality'),
@@ -169,6 +190,81 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.scaleSlider.addEventListener('input', (e) => {
             state.scalePercent = parseInt(e.target.value);
             elements.scaleValueBadge.textContent = state.scalePercent + '%';
+            triggerProcess();
+        });
+
+        // Adjustments & Filters
+        elements.brightnessSlider.addEventListener('input', (e) => {
+            state.brightness = parseInt(e.target.value);
+            elements.brightnessValueBadge.value = state.brightness;
+            triggerProcess();
+        });
+        elements.contrastSlider.addEventListener('input', (e) => {
+            state.contrast = parseInt(e.target.value);
+            elements.contrastValueBadge.value = state.contrast;
+            triggerProcess();
+        });
+        elements.saturationSlider.addEventListener('input', (e) => {
+            state.saturation = parseInt(e.target.value);
+            elements.saturationValueBadge.value = state.saturation;
+            triggerProcess();
+        });
+        elements.sharpnessSlider.addEventListener('input', (e) => {
+            state.sharpness = parseInt(e.target.value);
+            elements.sharpnessValueBadge.value = state.sharpness;
+            triggerProcess();
+        });
+        elements.blurSlider.addEventListener('input', (e) => {
+            state.blur = parseInt(e.target.value);
+            elements.blurValueBadge.value = state.blur;
+            triggerProcess();
+        });
+
+        // Typed values in the badge inputs sync back to the slider + state
+        function bindBadgeInput(badgeEl, sliderEl, stateKey, min, max) {
+            badgeEl.addEventListener('input', (e) => {
+                let val = parseInt(e.target.value);
+                if (isNaN(val)) return; // let them keep typing (e.g. clearing the field)
+                val = Math.max(min, Math.min(max, val));
+                state[stateKey] = val;
+                sliderEl.value = val;
+                triggerProcess();
+            });
+            badgeEl.addEventListener('blur', (e) => {
+                // Snap back to a valid number if left empty/invalid
+                let val = parseInt(e.target.value);
+                if (isNaN(val)) val = state[stateKey];
+                val = Math.max(min, Math.min(max, val));
+                e.target.value = val;
+                state[stateKey] = val;
+                sliderEl.value = val;
+                triggerProcess();
+            });
+        }
+        bindBadgeInput(elements.brightnessValueBadge, elements.brightnessSlider, 'brightness', 0, 200);
+        bindBadgeInput(elements.contrastValueBadge, elements.contrastSlider, 'contrast', 0, 200);
+        bindBadgeInput(elements.saturationValueBadge, elements.saturationSlider, 'saturation', 0, 200);
+        bindBadgeInput(elements.sharpnessValueBadge, elements.sharpnessSlider, 'sharpness', 0, 200);
+        bindBadgeInput(elements.blurValueBadge, elements.blurSlider, 'blur', 0, 20);
+
+        elements.filterPresets.addEventListener('click', (e) => {
+            const btn = e.target.closest('.preset-btn');
+            if (!btn) return;
+            elements.filterPresets.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.filterType = btn.dataset.filter;
+            triggerProcess();
+        });
+        elements.btnResetAdjust.addEventListener('click', () => {
+            state.brightness = 100; state.contrast = 100; state.saturation = 100;
+            state.sharpness = 100; state.blur = 0; state.filterType = 'none';
+            elements.brightnessSlider.value = 100; elements.brightnessValueBadge.value = 100;
+            elements.contrastSlider.value = 100; elements.contrastValueBadge.value = 100;
+            elements.saturationSlider.value = 100; elements.saturationValueBadge.value = 100;
+            elements.sharpnessSlider.value = 100; elements.sharpnessValueBadge.value = 100;
+            elements.blurSlider.value = 0; elements.blurValueBadge.value = 0;
+            elements.filterPresets.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            elements.filterPresets.querySelector('[data-filter="none"]').classList.add('active');
             triggerProcess();
         });
 
@@ -555,7 +651,13 @@ document.addEventListener('DOMContentLoaded', () => {
             format: state.format,
             quality: state.quality,
             target_kb: state.mode === 'target' ? state.targetKB : null,
-            keep_exif: state.keepEXIF
+            keep_exif: state.keepEXIF,
+            brightness: state.brightness,
+            contrast: state.contrast,
+            saturation: state.saturation,
+            sharpness: state.sharpness,
+            blur: state.blur,
+            filter_type: state.filterType
         };
 
         fetch('/api/process', {
