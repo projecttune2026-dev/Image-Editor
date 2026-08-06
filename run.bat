@@ -1,4 +1,4 @@
-@echo off
+title PixelPerfect Pro
+echo off
 cd /d "%~dp0"
-start "" "%~dp0venv\Scripts\pythonw.exe" "%~dp0app.py"
-exit
+"%~dp0venv\Scripts\pythonw.exe" "%~dp0app.py"

@@ -1,2 +1,6 @@
 Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run """C:\Projects\image-compressor-cropper\venv\Scripts\pythonw.exe"" ""C:\Projects\image-compressor-cropper\app.py""", 0, False
+Set fso = CreateObject("Scripting.FileSystemObject")
+scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
+pythonwPath = fso.BuildPath(scriptDir, "venv\Scripts\pythonw.exe")
+appPath = fso.BuildPath(scriptDir, "app.py")
+WshShell.Run """" & pythonwPath & """ """ & appPath & """", 0, False

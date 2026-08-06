@@ -27,6 +27,9 @@
         </div>
 
         <div class="header-actions">
+            <button class="btn btn-secondary" id="btnThemeCustomizer" title="Customize Glassmorphism UI & Accent Color">
+                <i class="fa-solid fa-palette"></i> Theme & Glass
+            </button>
             <button class="btn btn-secondary" id="btnOpenFile">
                 <i class="fa-solid fa-folder-open"></i> Open Image
             </button>
@@ -110,6 +113,22 @@
                 </div>
 
                 <div class="card-header border-0 pb-0 mt-2">
+                    <label class="text-sm">Warmth / Temp</label>
+                    <span><input type="number" class="value-badge-input" id="temperatureValueBadge" value="0" min="-100" max="100"><span class="value-badge-unit">°</span></span>
+                </div>
+                <div class="range-container">
+                    <input type="range" id="temperatureSlider" min="-100" max="100" value="0" step="1">
+                </div>
+
+                <div class="card-header border-0 pb-0 mt-2">
+                    <label class="text-sm">Vignette</label>
+                    <span><input type="number" class="value-badge-input" id="vignetteValueBadge" value="0" min="0" max="100"><span class="value-badge-unit">%</span></span>
+                </div>
+                <div class="range-container">
+                    <input type="range" id="vignetteSlider" min="0" max="100" value="0" step="1">
+                </div>
+
+                <div class="card-header border-0 pb-0 mt-2">
                     <label class="text-sm">Blur</label>
                     <span><input type="number" class="value-badge-input" id="blurValueBadge" value="0" min="0" max="20"><span class="value-badge-unit">px</span></span>
                 </div>
@@ -120,11 +139,125 @@
                 <div class="card-header border-0 pb-0 mt-2">
                     <label class="text-sm">Filter</label>
                 </div>
-                <div class="ratio-presets" id="filterPresets">
+                <div class="ratio-presets" id="filterPresets" style="grid-template-columns: repeat(3, 1fr);">
                     <button class="preset-btn active" data-filter="none">None</button>
-                    <button class="preset-btn" data-filter="grayscale">Grayscale</button>
+                    <button class="preset-btn" data-filter="grayscale">B&W</button>
                     <button class="preset-btn" data-filter="sepia">Sepia</button>
                     <button class="preset-btn" data-filter="invert">Invert</button>
+                    <button class="preset-btn" data-filter="doc_scan">Doc Scan</button>
+                </div>
+            </div>
+
+            <!-- Section 1.8: Markup & Annotations -->
+            <div class="control-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-pen-ruler"></i> Markup & Annotations</h3>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="tool-btn" id="btnUndoAnnotation" title="Undo Last Markup" style="width: 28px; height: 26px; font-size: 0.75rem;"><i class="fa-solid fa-rotate-left"></i></button>
+                        <button class="tool-btn" id="btnClearAnnotation" title="Clear All Markups" style="width: 28px; height: 26px; font-size: 0.75rem;"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                </div>
+
+                <!-- Active Tool Tabs -->
+                <div class="ratio-presets" id="annotationToolTabs" style="grid-template-columns: repeat(4, 1fr);">
+                    <button class="preset-btn active" data-tool="select" title="Crop & Select"><i class="fa-solid fa-vector-square"></i> Select</button>
+                    <button class="preset-btn" data-tool="draw" title="Draw Freehand"><i class="fa-solid fa-paintbrush"></i> Draw</button>
+                    <button class="preset-btn" data-tool="text" title="Add Text Overlay"><i class="fa-solid fa-font"></i> Text</button>
+                    <button class="preset-btn" data-tool="sticker" title="Stickers & Emojis"><i class="fa-solid fa-face-smile"></i> Sticker</button>
+                </div>
+
+                <!-- Subpanel 1: Freehand Drawing Controls -->
+                <div class="annotation-subpanel mt-2" id="panelDrawControls">
+                    <div class="card-header border-0 pb-0">
+                        <label class="text-sm">Brush Size</label>
+                        <span class="value-badge" id="brushSizeBadge">5px</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="brushSizeSlider" min="1" max="50" value="5" step="1">
+                    </div>
+
+                    <div class="card-header border-0 pb-0 mt-2" style="align-items: center;">
+                        <label class="text-sm">Brush Color</label>
+                        <input type="color" id="brushColorPicker" value="#00f2fe" class="color-picker-input">
+                    </div>
+                    <div class="color-presets-grid" id="colorPresetsGrid">
+                        <span class="color-swatch active" data-color="#00f2fe" style="background: #00f2fe;"></span>
+                        <span class="color-swatch" data-color="#4facfe" style="background: #4facfe;"></span>
+                        <span class="color-swatch" data-color="#00e676" style="background: #00e676;"></span>
+                        <span class="color-swatch" data-color="#ff5252" style="background: #ff5252;"></span>
+                        <span class="color-swatch" data-color="#ffb74d" style="background: #ffb74d;"></span>
+                        <span class="color-swatch" data-color="#ffffff" style="background: #ffffff;"></span>
+                        <span class="color-swatch" data-color="#000000" style="background: #000000;"></span>
+                        <span class="color-swatch" data-color="#e040fb" style="background: #e040fb;"></span>
+                    </div>
+                </div>
+
+                <!-- Subpanel 2: Text Controls -->
+                <div class="annotation-subpanel hidden mt-2" id="panelTextControls">
+                    <div class="form-group">
+                        <label>Text Content</label>
+                        <input type="text" id="annotationTextInput" placeholder="Enter text here..." class="custom-text-input" value="PixelCompress">
+                    </div>
+
+                    <div class="dimension-inputs mt-2">
+                        <div class="input-group">
+                            <label>Font Size</label>
+                            <input type="number" id="fontSizeInput" value="42" min="10" max="200">
+                        </div>
+                        <div class="input-group">
+                            <label>Font Family</label>
+                            <select id="fontFamilySelect" class="custom-select" style="padding: 4px 8px; font-size: 0.8rem;">
+                                <option value="Inter">Inter</option>
+                                <option value="Outfit">Outfit</option>
+                                <option value="Impact">Impact</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Courier New">Courier</option>
+                                <option value="Georgia">Georgia</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="card-header border-0 pb-0 mt-2" style="align-items: center;">
+                        <label class="text-sm">Text Color</label>
+                        <input type="color" id="textColorPicker" value="#ffffff" class="color-picker-input">
+                    </div>
+
+                    <button class="btn btn-primary full-width mt-2" id="btnAddTextToCanvas">
+                        <i class="fa-solid fa-plus"></i> Add Text (Click Canvas)
+                    </button>
+                </div>
+
+                <!-- Subpanel 3: Sticker / Emoji Catalog -->
+                <div class="annotation-subpanel hidden mt-2" id="panelStickerControls">
+                    <div class="card-header border-0 pb-0">
+                        <label class="text-sm">Sticker Size</label>
+                        <span class="value-badge" id="stickerSizeBadge">48px</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="stickerSizeSlider" min="20" max="150" value="48" step="4">
+                    </div>
+
+                    <div class="sticker-grid custom-scrollbar mt-2" id="stickerGrid">
+                        <!-- Filled dynamically or with static elements -->
+                        <button class="sticker-btn active" data-sticker="⭐">⭐</button>
+                        <button class="sticker-btn" data-sticker="🔥">🔥</button>
+                        <button class="sticker-btn" data-sticker="❤️">❤️</button>
+                        <button class="sticker-btn" data-sticker="👍">👍</button>
+                        <button class="sticker-btn" data-sticker="🎯">🎯</button>
+                        <button class="sticker-btn" data-sticker="🚀">🚀</button>
+                        <button class="sticker-btn" data-sticker="💡">💡</button>
+                        <button class="sticker-btn" data-sticker="⚠️">⚠️</button>
+                        <button class="sticker-btn" data-sticker="🏷️">🏷️</button>
+                        <button class="sticker-btn" data-sticker="👑">👑</button>
+                        <button class="sticker-btn" data-sticker="💥">💥</button>
+                        <button class="sticker-btn" data-sticker="📌">📌</button>
+                        <button class="sticker-btn" data-sticker="💯">💯</button>
+                        <button class="sticker-btn" data-sticker="😎">😎</button>
+                        <button class="sticker-btn" data-sticker="🎨">🎨</button>
+                        <button class="sticker-btn" data-sticker="📸">📸</button>
+                        <button class="sticker-btn" data-sticker="✅">✅</button>
+                        <button class="sticker-btn" data-sticker="❌">❌</button>
+                    </div>
                 </div>
             </div>
 
@@ -158,7 +291,7 @@
                 </div>
 
                 <div class="card-header border-0 pb-0 mt-2">
-                    <label class="text-sm"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Scale %</label>
+                    <label class="text-sm"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Scale / Resize %</label>
                     <span class="value-badge" id="scaleValueBadge">100%</span>
                 </div>
                 <div class="range-container">
@@ -183,7 +316,7 @@
                 </div>
 
                 <!-- Mode Switcher: Quality vs Target KB -->
-                <div class="compress-mode-toggle">
+                <div class="compress-mode-toggle mt-2">
                     <button class="mode-btn active" id="modeQuality">Quality Mode</button>
                     <button class="mode-btn" id="modeTargetKB">Target Size Mode</button>
                 </div>
@@ -216,9 +349,106 @@
                     </div>
                 </div>
 
-                <div class="switch-group">
+                <div class="switch-group mt-2">
                     <label for="switchEXIF"><i class="fa-solid fa-shield-halved"></i> Preserve EXIF Metadata</label>
                     <input type="checkbox" id="switchEXIF" class="custom-switch">
+                </div>
+
+            </div>
+
+            <!-- Section 4: Dual Image Blender & Joiner -->
+            <div class="control-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-clone"></i> Dual Image Blender & Joiner</h3>
+                </div>
+
+                <!-- Secondary File Loader -->
+                <div class="secondary-file-box" id="secFileBox">
+                    <button class="btn btn-secondary text-sm full-width" id="btnUploadSecondary">
+                        <i class="fa-solid fa-plus"></i> Load 2nd Image
+                    </button>
+                    <input type="file" id="hiddenSecondaryFileInput" accept="image/*" class="hidden">
+                    <div class="secondary-info hidden" id="secInfo">
+                        <span id="secFileName">image2.png</span>
+                        <button id="btnClearSecondary" title="Remove 2nd Image"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+
+                <!-- Blend Mode Tabs -->
+                <div class="blend-mode-tabs mt-2" id="blendModeTabs">
+                    <button class="mode-btn active" data-blend="overlay"><i class="fa-solid fa-layer-group"></i> Overlay (PIP)</button>
+                    <button class="mode-btn" data-blend="fade"><i class="fa-solid fa-circle-half-stroke"></i> Fade / Blend</button>
+                    <button class="mode-btn" data-blend="join"><i class="fa-solid fa-object-group"></i> Join / Stitch</button>
+                </div>
+
+                <!-- Mode Controls: Overlay / Picture-in-Picture -->
+                <div class="blend-panel mt-2" id="panelBlendOverlay">
+                    <div class="card-header border-0 pb-0">
+                        <label class="text-sm">Overlay Scale %</label>
+                        <span class="value-badge" id="pipScaleBadge">30%</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="pipScaleSlider" min="5" max="100" value="30" step="5">
+                    </div>
+
+                    <div class="card-header border-0 pb-0 mt-2">
+                        <label class="text-sm">Opacity %</label>
+                        <span class="value-badge" id="pipOpacityBadge">100%</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="pipOpacitySlider" min="0" max="100" value="100" step="5">
+                    </div>
+
+                    <div class="form-group mt-2">
+                        <label class="text-sm">Position Preset</label>
+                        <div class="position-grid" id="pipPositionGrid">
+                            <button class="pos-btn" data-pos="top-left" title="Top Left"><i class="fa-solid fa-arrow-up-left"></i></button>
+                            <button class="pos-btn" data-pos="top-right" title="Top Right"><i class="fa-solid fa-arrow-up-right"></i></button>
+                            <button class="pos-btn" data-pos="center" title="Center"><i class="fa-solid fa-arrows-to-circle"></i></button>
+                            <button class="pos-btn" data-pos="bottom-left" title="Bottom Left"><i class="fa-solid fa-arrow-down-left"></i></button>
+                            <button class="pos-btn active" data-pos="bottom-right" title="Bottom Right"><i class="fa-solid fa-arrow-down-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mode Controls: Fade / Blend -->
+                <div class="blend-panel mt-2 hidden" id="panelBlendFade">
+                    <div class="card-header border-0 pb-0">
+                        <label class="text-sm">Fade / Mix Ratio</label>
+                        <span class="value-badge highlight" id="fadeRatioBadge">50%</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="fadeRatioSlider" min="0" max="100" value="50" step="2">
+                    </div>
+
+                    <div class="form-group mt-2">
+                        <label class="text-sm">Blend Mode</label>
+                        <select id="selectBlendMode" class="custom-select" style="width: 100%;">
+                            <option value="normal" selected>Normal Crossfade</option>
+                            <option value="multiply">Multiply (Darken)</option>
+                            <option value="screen">Screen (Lighten)</option>
+                            <option value="overlay">Overlay Contrast</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Mode Controls: Join / Stitch -->
+                <div class="blend-panel mt-2 hidden" id="panelBlendJoin">
+                    <div class="form-group">
+                        <label class="text-sm">Join Direction</label>
+                        <div class="join-dir-selector">
+                            <button class="dir-btn active" id="btnJoinHorizontal"><i class="fa-solid fa-grip-lines-vertical"></i> Side-by-Side</button>
+                            <button class="dir-btn" id="btnJoinVertical"><i class="fa-solid fa-grip-lines"></i> Stacked (Top/Bottom)</button>
+                        </div>
+                    </div>
+
+                    <div class="card-header border-0 pb-0 mt-2">
+                        <label class="text-sm">Gap Spacing (px)</label>
+                        <span class="value-badge" id="joinGapBadge">0px</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="joinGapSlider" min="0" max="50" value="0" step="2">
+                    </div>
                 </div>
 
             </div>
@@ -226,7 +456,7 @@
         </aside>
 
         <!-- Center Workspace Canvas Viewport -->
-        <section class="canvas-viewport">
+        <section class="canvas-viewport" id="canvasViewport">
             
             <!-- Viewport Controls & Comparison Switch -->
             <div class="viewport-toolbar">
@@ -239,7 +469,8 @@
                     <button class="zoom-btn" id="btnZoomOut" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
                     <span id="zoomLevel">100%</span>
                     <button class="zoom-btn" id="btnZoomIn" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
-                    <button class="zoom-btn" id="btnZoomReset" title="Reset Zoom"><i class="fa-solid fa-expand"></i></button>
+                    <button class="zoom-btn" id="btnZoomReset" title="Reset Zoom (100%)"><i class="fa-solid fa-rotate-left"></i></button>
+                    <button class="zoom-btn" id="btnFullscreen" title="Toggle Full Screen"><i class="fa-solid fa-expand"></i></button>
                 </div>
             </div>
 
@@ -264,6 +495,7 @@
                 <!-- Cropper Canvas Workspace -->
                 <div class="canvas-workspace hidden" id="canvasWorkspace">
                     <canvas id="mainCanvas"></canvas>
+                    <canvas id="annotationCanvas"></canvas>
                     
                     <!-- Crop Overlay Box -->
                     <div class="crop-overlay-box" id="cropOverlay">
@@ -289,10 +521,8 @@
                 <!-- Side-by-Side Comparison Workspace -->
                 <div class="comparison-workspace hidden" id="comparisonWorkspace">
                     <div class="comparison-container" id="comparisonContainer">
-                        <img id="imgBefore" alt="Original Image">
-                        <div class="after-wrapper" id="afterWrapper">
-                            <img id="imgAfter" alt="Compressed Output">
-                        </div>
+                        <img id="imgBefore" class="comp-img comp-before" alt="Original Image">
+                        <img id="imgAfter" class="comp-img comp-after" alt="Compressed Output">
                         <div class="comparison-slider-bar" id="comparisonSliderBar">
                             <div class="slider-handle"><i class="fa-solid fa-arrows-left-right"></i></div>
                         </div>
@@ -383,6 +613,93 @@
         <div class="drawer-content custom-scrollbar" id="batchItemsContainer">
             <div class="empty-batch-state">
                 <p>No files in batch queue. Open multiple files or add single images to process together.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Glassmorphism Theme Customizer Modal -->
+    <div class="modal-backdrop hidden" id="themeModalBackdrop">
+        <div class="glass-modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-palette"></i> Glass UI Customizer</h3>
+                <button class="modal-close-btn" id="btnCloseThemeModal">&times;</button>
+            </div>
+            
+            <div class="modal-body custom-scrollbar">
+                <!-- Preset Glass Themes -->
+                <div class="customizer-section">
+                    <label class="section-title">Glass Theme Presets</label>
+                    <div class="theme-presets-grid" id="themePresetsGrid">
+                        <button class="theme-card active" data-preset="cosmic">
+                            <div class="theme-preview cosmic-preview"></div>
+                            <span>Deep Cosmic</span>
+                        </button>
+                        <button class="theme-card" data-preset="obsidian">
+                            <div class="theme-preview obsidian-preview"></div>
+                            <span>Obsidian Neon</span>
+                        </button>
+                        <button class="theme-card" data-preset="emerald">
+                            <div class="theme-preview emerald-preview"></div>
+                            <span>Mint Emerald</span>
+                        </button>
+                        <button class="theme-card" data-preset="diamond">
+                            <div class="theme-preview diamond-preview"></div>
+                            <span>Frosted Light</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Accent Color Palette -->
+                <div class="customizer-section mt-3">
+                    <div class="card-header border-0 pb-0 p-0" style="align-items: center;">
+                        <label class="section-title mb-0">Accent Glow Color</label>
+                        <input type="color" id="themeCustomColorPicker" value="#00f2fe" class="color-picker-input">
+                    </div>
+                    <div class="accent-swatches-grid mt-2" id="accentSwatchesGrid">
+                        <span class="accent-swatch active" data-color="#00f2fe" style="background: #00f2fe;"></span>
+                        <span class="accent-swatch" data-color="#a855f7" style="background: #a855f7;"></span>
+                        <span class="accent-swatch" data-color="#00e676" style="background: #00e676;"></span>
+                        <span class="accent-swatch" data-color="#ff5252" style="background: #ff5252;"></span>
+                        <span class="accent-swatch" data-color="#f59e0b" style="background: #f59e0b;"></span>
+                        <span class="accent-swatch" data-color="#ec4899" style="background: #ec4899;"></span>
+                    </div>
+                </div>
+
+                <!-- Sliders: Blur, Opacity, Radius -->
+                <div class="customizer-section mt-3">
+                    <div class="card-header border-0 pb-0 p-0">
+                        <label class="text-sm">Backdrop Blur Strength</label>
+                        <span class="value-badge" id="blurValueBadgeUI">16px</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="themeBlurSlider" min="4" max="30" value="16" step="1">
+                    </div>
+
+                    <div class="card-header border-0 pb-0 p-0 mt-2">
+                        <label class="text-sm">Glass Opacity</label>
+                        <span class="value-badge" id="opacityValueBadgeUI">65%</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="themeOpacitySlider" min="20" max="90" value="65" step="5">
+                    </div>
+
+                    <div class="card-header border-0 pb-0 p-0 mt-2">
+                        <label class="text-sm">Card Corner Radius</label>
+                        <span class="value-badge" id="radiusValueBadgeUI">12px</span>
+                    </div>
+                    <div class="range-container">
+                        <input type="range" id="themeRadiusSlider" min="6" max="24" value="12" step="2">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" id="btnResetThemeDefaults">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Defaults
+                </button>
+                <button class="btn btn-primary btn-sm" id="btnApplyTheme">
+                    <i class="fa-solid fa-check"></i> Done
+                </button>
             </div>
         </div>
     </div>

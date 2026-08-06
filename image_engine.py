@@ -1,7 +1,7 @@
 import io
 import os
 import base64
-from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+from PIL import Image, ImageOps, ImageEnhance, ImageFilter, ImageChops
 
 def load_image(source):
     """
@@ -21,8 +21,118 @@ def load_image(source):
             return Image.open(io.BytesIO(image_data))
         elif os.path.exists(source):
             return Image.open(source)
-    
-    raise ValueError("Unsupported image source format")
+            
+    raise ValueError("Invalid image source provided.")
+
+
+def blend_overlay_images(primary_img, secondary_img, blend_config=None):
+    """
+    Blends or joins primary and secondary PIL images based on blend_config parameters:
+    mode: 'overlay' (picture-in-picture), 'fade' (blend/crossfade), or 'join' (horizontal/vertical stitch)
+    """
+    if not secondary_img or not blend_config:
+        return primary_img
+
+    if not isinstance(secondary_img, Image.Image):
+        secondary_img = load_image(secondary_img)
+
+    mode = str(blend_config.get('mode', 'overlay')).lower()
+
+    if mode == 'overlay':
+        # Picture-in-Picture Overlay
+        scale_pct = float(blend_config.get('scale', 30)) / 100.0
+        opacity = float(blend_config.get('opacity', 100)) / 100.0
+        position = str(blend_config.get('position', 'bottom-right')).lower()
+        margin = int(blend_config.get('margin', 20))
+
+        base = primary_img.convert('RGBA')
+        sec = secondary_img.convert('RGBA')
+
+        sec_w = max(1, int(base.width * scale_pct))
+        sec_h = max(1, int(sec.height * (sec_w / float(sec.width))))
+        sec = sec.resize((sec_w, sec_h), Image.Resampling.LANCZOS)
+
+        if opacity < 1.0:
+            r, g, b, a = sec.split()
+            a = a.point(lambda i: int(i * opacity))
+            sec = Image.merge('RGBA', (r, g, b, a))
+
+        if position == 'top-left':
+            x, y = margin, margin
+        elif position == 'top-right':
+            x, y = base.width - sec_w - margin, margin
+        elif position == 'bottom-left':
+            x, y = margin, base.height - sec_h - margin
+        elif position == 'center':
+            x, y = (base.width - sec_w) // 2, (base.height - sec_h) // 2
+        else: # bottom-right
+            x, y = base.width - sec_w - margin, base.height - sec_h - margin
+
+        x = max(0, min(x, base.width - 1))
+        y = max(0, min(y, base.height - 1))
+
+        overlay_layer = Image.new('RGBA', base.size, (0, 0, 0, 0))
+        overlay_layer.paste(sec, (x, y))
+        res_img = Image.alpha_composite(base, overlay_layer)
+        return res_img if primary_img.mode != 'RGB' else res_img.convert('RGB')
+
+    elif mode == 'fade':
+        # Crossfade / Alpha Blend
+        blend_ratio = float(blend_config.get('fade_ratio', 50)) / 100.0
+        blend_mode = str(blend_config.get('blend_mode', 'normal')).lower()
+
+        base = primary_img.convert('RGBA')
+        sec = secondary_img.convert('RGBA')
+        sec = sec.resize(base.size, Image.Resampling.LANCZOS)
+
+        if blend_mode == 'multiply':
+            res_img = ImageChops.multiply(base.convert('RGB'), sec.convert('RGB'))
+            res_img = Image.blend(base.convert('RGB'), res_img, blend_ratio)
+        elif blend_mode == 'screen':
+            res_img = ImageChops.screen(base.convert('RGB'), sec.convert('RGB'))
+            res_img = Image.blend(base.convert('RGB'), res_img, blend_ratio)
+        elif blend_mode == 'overlay':
+            res_img = ImageChops.overlay(base.convert('RGB'), sec.convert('RGB'))
+            res_img = Image.blend(base.convert('RGB'), res_img, blend_ratio)
+        else: # normal crossfade
+            res_img = Image.blend(base.convert('RGB'), sec.convert('RGB'), blend_ratio)
+
+        return res_img if primary_img.mode != 'RGBA' else res_img.convert('RGBA')
+
+    elif mode == 'join':
+        # Side-by-Side or Stacked Joining
+        direction = str(blend_config.get('direction', 'horizontal')).lower()
+        gap = int(blend_config.get('gap', 0))
+
+        base = primary_img.convert('RGBA')
+        sec = secondary_img.convert('RGBA')
+
+        if direction == 'vertical': # Stacked top-bottom
+            sec_w = base.width
+            sec_h = max(1, int(sec.height * (sec_w / float(sec.width))))
+            sec = sec.resize((sec_w, sec_h), Image.Resampling.LANCZOS)
+
+            total_w = base.width
+            total_h = base.height + gap + sec_h
+
+            joined = Image.new('RGBA', (total_w, total_h), (0, 0, 0, 0))
+            joined.paste(base, (0, 0))
+            joined.paste(sec, (0, base.height + gap))
+        else: # Horizontal side-by-side
+            sec_h = base.height
+            sec_w = max(1, int(sec.width * (sec_h / float(sec.height))))
+            sec = sec.resize((sec_w, sec_h), Image.Resampling.LANCZOS)
+
+            total_w = base.width + gap + sec_w
+            total_h = base.height
+
+            joined = Image.new('RGBA', (total_w, total_h), (0, 0, 0, 0))
+            joined.paste(base, (0, 0))
+            joined.paste(sec, (base.width + gap, 0))
+
+        return joined if primary_img.mode != 'RGB' else joined.convert('RGB')
+
+    return primary_img
 
 
 def get_image_info(img_source):
@@ -120,16 +230,93 @@ def transform_image(img, crop_box=None, rotate_angle=0, flip_h=False, flip_v=Fal
     return res_img
 
 
-def apply_adjustments(img, brightness=100, contrast=100, saturation=100, sharpness=100, blur=0, filter_type='none'):
+def apply_temperature(img, temp_val):
     """
-    Applies tonal/color adjustments and stylistic filters to a PIL image.
-    brightness/contrast/saturation/sharpness: 100 = no change, percentage-style sliders
-    blur: gaussian blur radius, 0 = none
-    filter_type: 'none' | 'grayscale' | 'sepia' | 'invert'
+    Adjusts color temperature (-100 cool blue to +100 golden warm).
+    """
+    if temp_val == 0:
+        return img
+    
+    was_rgba = img.mode == 'RGBA'
+    alpha = img.split()[-1] if was_rgba else None
+    base = img.convert('RGB')
+    
+    # Calculate RGB channel multipliers based on temperature value
+    factor = temp_val / 100.0
+    if factor > 0:
+        # Warm shift: boost Red, slightly boost Green, reduce Blue
+        r_gain = 1.0 + (0.2 * factor)
+        g_gain = 1.0 + (0.05 * factor)
+        b_gain = 1.0 - (0.2 * factor)
+    else:
+        # Cool shift: reduce Red, boost Blue
+        factor = abs(factor)
+        r_gain = 1.0 - (0.2 * factor)
+        g_gain = 1.0
+        b_gain = 1.0 + (0.25 * factor)
+        
+    r, g, b = base.split()
+    r = r.point(lambda i: max(0, min(255, int(i * r_gain))))
+    g = g.point(lambda i: max(0, min(255, int(i * g_gain))))
+    b = b.point(lambda i: max(0, min(255, int(i * b_gain))))
+    
+    res_img = Image.merge('RGB', (r, g, b))
+    if was_rgba:
+        res_img.putalpha(alpha)
+        res_img = res_img.convert('RGBA')
+    return res_img
+
+
+def apply_vignette(img, intensity):
+    """
+    Applies radial vignette corner darkening (intensity 0 to 100).
+    """
+    if intensity <= 0:
+        return img
+    
+    was_rgba = img.mode == 'RGBA'
+    alpha = img.split()[-1] if was_rgba else None
+    base = img.convert('RGB')
+    
+    w, h = base.size
+    # Create radial gradient mask
+    import math
+    max_radius = math.hypot(w / 2.0, h / 2.0)
+    factor = (intensity / 100.0) * 1.5
+    
+    # Generate mask image efficiently
+    mask = Image.new('L', (w, h))
+    pixels = mask.load()
+    cx, cy = w / 2.0, h / 2.0
+    
+    for y in range(h):
+        dy = y - cy
+        for x in range(w):
+            dx = x - cx
+            dist = math.hypot(dx, dy) / max_radius
+            v = max(0.0, min(1.0, 1.0 - (dist * factor)))
+            pixels[x, y] = int(v * 255)
+            
+    # Multiply image RGB channels by mask
+    r, g, b = base.split()
+    r = Image.composite(r, Image.new('L', (w, h), 0), mask)
+    g = Image.composite(g, Image.new('L', (w, h), 0), mask)
+    b = Image.composite(b, Image.new('L', (w, h), 0), mask)
+    
+    res_img = Image.merge('RGB', (r, g, b))
+    if was_rgba:
+        res_img.putalpha(alpha)
+        res_img = res_img.convert('RGBA')
+    return res_img
+
+
+def apply_adjustments(img, brightness=100, contrast=100, saturation=100, sharpness=100, blur=0, temperature=0, vignette=0, filter_type='none'):
+    """
+    Applies tonal/color adjustments, temperature, vignette, and stylistic filters to a PIL image.
     """
     res_img = img
 
-    # 1. Brightness / Contrast / Saturation / Sharpness (only touch if changed, cheaper + avoids drift)
+    # 1. Brightness / Contrast / Saturation / Sharpness
     if brightness != 100:
         res_img = ImageEnhance.Brightness(res_img).enhance(brightness / 100.0)
     if contrast != 100:
@@ -139,11 +326,19 @@ def apply_adjustments(img, brightness=100, contrast=100, saturation=100, sharpne
     if sharpness != 100:
         res_img = ImageEnhance.Sharpness(res_img).enhance(sharpness / 100.0)
 
-    # 2. Blur
+    # 2. Temperature (Warmth / Coolness)
+    if temperature and temperature != 0:
+        res_img = apply_temperature(res_img, temperature)
+
+    # 3. Vignette
+    if vignette and vignette > 0:
+        res_img = apply_vignette(res_img, vignette)
+
+    # 4. Blur
     if blur and blur > 0:
         res_img = res_img.filter(ImageFilter.GaussianBlur(radius=blur))
 
-    # 3. Stylistic filter (grayscale / sepia / invert)
+    # 5. Stylistic filters (grayscale / sepia / invert / doc_scan)
     filter_type = (filter_type or 'none').lower()
     if filter_type == 'grayscale':
         was_rgba = res_img.mode == 'RGBA'
@@ -157,7 +352,6 @@ def apply_adjustments(img, brightness=100, contrast=100, saturation=100, sharpne
         was_rgba = res_img.mode == 'RGBA'
         alpha = res_img.split()[-1] if was_rgba else None
         gray = ImageOps.grayscale(res_img.convert('RGB'))
-        # Classic sepia tone matrix applied via colorize
         sepia_img = ImageOps.colorize(gray, black=(40, 26, 13), white=(255, 240, 192))
         res_img = sepia_img.convert('RGB')
         if was_rgba:
@@ -168,6 +362,17 @@ def apply_adjustments(img, brightness=100, contrast=100, saturation=100, sharpne
         alpha = res_img.split()[-1] if was_rgba else None
         base = res_img.convert('RGB')
         res_img = ImageOps.invert(base)
+        if was_rgba:
+            res_img.putalpha(alpha)
+            res_img = res_img.convert('RGBA')
+    elif filter_type in ('doc_scan', 'document'):
+        was_rgba = res_img.mode == 'RGBA'
+        alpha = res_img.split()[-1] if was_rgba else None
+        gray = ImageOps.grayscale(res_img.convert('RGB'))
+        # High contrast document scanner enhancement
+        enhanced = ImageEnhance.Contrast(gray).enhance(2.8)
+        enhanced = ImageEnhance.Sharpness(enhanced).enhance(2.0)
+        res_img = enhanced.convert('RGB')
         if was_rgba:
             res_img.putalpha(alpha)
             res_img = res_img.convert('RGBA')
@@ -272,9 +477,9 @@ def compress_to_target_size(img, target_kb, format='JPEG', keep_exif=False):
     return encode_image(final_scaled, format=format, quality=5, keep_exif=keep_exif), 5, 10
 
 
-def process_image_full(img_source, crop_box=None, rotate_angle=0, flip_h=False, flip_v=False, scale_percent=100, max_w=None, max_h=None, exact_w=None, exact_h=None, format='JPEG', quality=85, target_kb=None, keep_exif=False, brightness=100, contrast=100, saturation=100, sharpness=100, blur=0, filter_type='none'):
+def process_image_full(img_source, crop_box=None, rotate_angle=0, flip_h=False, flip_v=False, scale_percent=100, max_w=None, max_h=None, exact_w=None, exact_h=None, format='JPEG', quality=85, target_kb=None, keep_exif=False, brightness=100, contrast=100, saturation=100, sharpness=100, blur=0, temperature=0, vignette=0, filter_type='none', secondary_img=None, blend_config=None):
     """
-    Complete pipeline: load -> transform -> adjust/filter -> compress/target_size -> metrics & base64 output.
+    Complete pipeline: load -> transform -> adjust/filter -> blend/stitch -> compress/target_size -> metrics & base64 output.
     """
     orig_img = load_image(img_source)
     orig_buf = io.BytesIO()
@@ -283,7 +488,10 @@ def process_image_full(img_source, crop_box=None, rotate_angle=0, flip_h=False, 
     orig_bytes = orig_buf.tell()
     
     transformed = transform_image(orig_img, crop_box, rotate_angle, flip_h, flip_v, scale_percent, max_w, max_h, exact_w, exact_h)
-    transformed = apply_adjustments(transformed, brightness, contrast, saturation, sharpness, blur, filter_type)
+    transformed = apply_adjustments(transformed, brightness, contrast, saturation, sharpness, blur, temperature, vignette, filter_type)
+    
+    if secondary_img and blend_config:
+        transformed = blend_overlay_images(transformed, secondary_img, blend_config)
     
     achieved_quality = quality
     achieved_scale = scale_percent

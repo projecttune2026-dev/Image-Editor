@@ -3,7 +3,7 @@ import sys
 import base64
 import threading
 import webview
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 import image_engine
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -103,7 +103,11 @@ def api_process():
         saturation = int(data.get('saturation', 100))
         sharpness = int(data.get('sharpness', 100))
         blur = int(data.get('blur', 0))
+        temperature = int(data.get('temperature', 0))
+        vignette = int(data.get('vignette', 0))
         filter_type = str(data.get('filter_type', 'none'))
+        secondary_img = data.get('secondary_image_data')
+        blend_config = data.get('blend_config')
 
         result = image_engine.process_image_full(
             img_source=img_source,
@@ -125,12 +129,38 @@ def api_process():
             saturation=saturation,
             sharpness=sharpness,
             blur=blur,
-            filter_type=filter_type
+            temperature=temperature,
+            vignette=vignette,
+            filter_type=filter_type,
+            secondary_img=secondary_img,
+            blend_config=blend_config
         )
         return jsonify(result)
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/download', methods=['POST'])
+def api_download():
+    try:
+        data = request.get_json()
+        b64_data = data.get('image_data')
+        filename = data.get('filename', 'optimized_image.png')
+        if not b64_data:
+            return jsonify({"error": "No image data provided"}), 400
+        
+        header, encoded = b64_data.split(',', 1)
+        mime = header.split(';')[0].split(':')[1] if ';' in header else 'image/png'
+        raw_bytes = base64.b64decode(encoded)
+        
+        return Response(
+            raw_bytes,
+            mimetype=mime,
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 

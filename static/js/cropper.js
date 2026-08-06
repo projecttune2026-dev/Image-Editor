@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
         saturation: 100,
         sharpness: 100,
         blur: 0,
+        temperature: 0,
+        vignette: 0,
         filterType: 'none',
         
         // Compression
@@ -50,7 +52,37 @@ document.addEventListener('DOMContentLoaded', () => {
         procSizeBytes: 0,
         
         // Batch
-        batchQueue: []
+        batchQueue: [],
+
+        // Dual Image Blender & Joiner State
+        secondaryImg: null,
+        secondaryImgSrc: null,
+        secondaryFileName: '',
+        blendConfig: {
+            mode: 'overlay',
+            scale: 30,
+            opacity: 100,
+            position: 'bottom-right',
+            margin: 20,
+            fade_ratio: 50,
+            blend_mode: 'normal',
+            direction: 'horizontal',
+            gap: 0
+        },
+
+        // Annotation & Markup State
+        annotation: {
+            activeTool: 'select',
+            brushColor: '#00f2fe',
+            brushSize: 5,
+            textContent: 'PixelCompress',
+            fontSize: 42,
+            fontFamily: 'Inter',
+            textColor: '#ffffff',
+            activeSticker: '⭐',
+            stickerSize: 48,
+            history: []
+        }
     };
 
     // DOM Element References
@@ -59,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dropZone: document.getElementById('dropZone'),
         canvasWorkspace: document.getElementById('canvasWorkspace'),
         mainCanvas: document.getElementById('mainCanvas'),
+        annotationCanvas: document.getElementById('annotationCanvas'),
         cropOverlay: document.getElementById('cropOverlay'),
         hiddenFileInput: document.getElementById('hiddenFileInput'),
         btnOpenFile: document.getElementById('btnOpenFile'),
@@ -66,6 +99,66 @@ document.addEventListener('DOMContentLoaded', () => {
         btnQuickSave: document.getElementById('btnQuickSave'),
         btnSaveToDisk: document.getElementById('btnSaveToDisk'),
         
+        // UI Customizer
+        btnThemeCustomizer: document.getElementById('btnThemeCustomizer'),
+        themeModalBackdrop: document.getElementById('themeModalBackdrop'),
+        btnCloseThemeModal: document.getElementById('btnCloseThemeModal'),
+        themePresetsGrid: document.getElementById('themePresetsGrid'),
+        themeCustomColorPicker: document.getElementById('themeCustomColorPicker'),
+        accentSwatchesGrid: document.getElementById('accentSwatchesGrid'),
+        themeBlurSlider: document.getElementById('themeBlurSlider'),
+        blurValueBadgeUI: document.getElementById('blurValueBadgeUI'),
+        themeOpacitySlider: document.getElementById('themeOpacitySlider'),
+        opacityValueBadgeUI: document.getElementById('opacityValueBadgeUI'),
+        themeRadiusSlider: document.getElementById('themeRadiusSlider'),
+        radiusValueBadgeUI: document.getElementById('radiusValueBadgeUI'),
+        btnResetThemeDefaults: document.getElementById('btnResetThemeDefaults'),
+        btnApplyTheme: document.getElementById('btnApplyTheme'),
+        
+        // Annotations & Markup
+        btnUndoAnnotation: document.getElementById('btnUndoAnnotation'),
+        btnClearAnnotation: document.getElementById('btnClearAnnotation'),
+        annotationToolTabs: document.getElementById('annotationToolTabs'),
+        panelDrawControls: document.getElementById('panelDrawControls'),
+        panelTextControls: document.getElementById('panelTextControls'),
+        panelStickerControls: document.getElementById('panelStickerControls'),
+        brushSizeSlider: document.getElementById('brushSizeSlider'),
+        brushSizeBadge: document.getElementById('brushSizeBadge'),
+        brushColorPicker: document.getElementById('brushColorPicker'),
+        colorPresetsGrid: document.getElementById('colorPresetsGrid'),
+        annotationTextInput: document.getElementById('annotationTextInput'),
+        fontSizeInput: document.getElementById('fontSizeInput'),
+        fontFamilySelect: document.getElementById('fontFamilySelect'),
+        textColorPicker: document.getElementById('textColorPicker'),
+        btnAddTextToCanvas: document.getElementById('btnAddTextToCanvas'),
+        stickerSizeSlider: document.getElementById('stickerSizeSlider'),
+        stickerSizeBadge: document.getElementById('stickerSizeBadge'),
+        stickerGrid: document.getElementById('stickerGrid'),
+        
+        // Dual Image Blender & Joiner
+        btnUploadSecondary: document.getElementById('btnUploadSecondary'),
+        hiddenSecondaryFileInput: document.getElementById('hiddenSecondaryFileInput'),
+        secFileBox: document.getElementById('secFileBox'),
+        secInfo: document.getElementById('secInfo'),
+        secFileName: document.getElementById('secFileName'),
+        btnClearSecondary: document.getElementById('btnClearSecondary'),
+        blendModeTabs: document.getElementById('blendModeTabs'),
+        panelBlendOverlay: document.getElementById('panelBlendOverlay'),
+        panelBlendFade: document.getElementById('panelBlendFade'),
+        panelBlendJoin: document.getElementById('panelBlendJoin'),
+        pipScaleSlider: document.getElementById('pipScaleSlider'),
+        pipScaleBadge: document.getElementById('pipScaleBadge'),
+        pipOpacitySlider: document.getElementById('pipOpacitySlider'),
+        pipOpacityBadge: document.getElementById('pipOpacityBadge'),
+        pipPositionGrid: document.getElementById('pipPositionGrid'),
+        fadeRatioSlider: document.getElementById('fadeRatioSlider'),
+        fadeRatioBadge: document.getElementById('fadeRatioBadge'),
+        selectBlendMode: document.getElementById('selectBlendMode'),
+        btnJoinHorizontal: document.getElementById('btnJoinHorizontal'),
+        btnJoinVertical: document.getElementById('btnJoinVertical'),
+        joinGapSlider: document.getElementById('joinGapSlider'),
+        joinGapBadge: document.getElementById('joinGapBadge'),
+
         // Controls
         ratioPresets: document.getElementById('ratioPresets'),
         btnRotateLeft: document.getElementById('btnRotateLeft'),
@@ -92,6 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
         sharpnessValueBadge: document.getElementById('sharpnessValueBadge'),
         blurSlider: document.getElementById('blurSlider'),
         blurValueBadge: document.getElementById('blurValueBadge'),
+        temperatureSlider: document.getElementById('temperatureSlider'),
+        temperatureValueBadge: document.getElementById('temperatureValueBadge'),
+        vignetteSlider: document.getElementById('vignetteSlider'),
+        vignetteValueBadge: document.getElementById('vignetteValueBadge'),
         filterPresets: document.getElementById('filterPresets'),
         btnResetAdjust: document.getElementById('btnResetAdjust'),
         
@@ -105,7 +202,14 @@ document.addEventListener('DOMContentLoaded', () => {
         inputTargetKB: document.getElementById('inputTargetKB'),
         switchEXIF: document.getElementById('switchEXIF'),
         
-        // View Modes
+        // View Modes & Zoom
+        canvasViewport: document.getElementById('canvasViewport'),
+        canvasContainer: document.getElementById('canvasContainer'),
+        btnZoomIn: document.getElementById('btnZoomIn'),
+        btnZoomOut: document.getElementById('btnZoomOut'),
+        btnZoomReset: document.getElementById('btnZoomReset'),
+        btnFullscreen: document.getElementById('btnFullscreen'),
+        zoomLevel: document.getElementById('zoomLevel'),
         viewModeCrop: document.getElementById('viewModeCrop'),
         viewModeCompare: document.getElementById('viewModeCompare'),
         comparisonWorkspace: document.getElementById('comparisonWorkspace'),
@@ -139,6 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const ctx = elements.mainCanvas.getContext('2d');
+    const actx = elements.annotationCanvas.getContext('2d');
 
     // ==========================================
     // INITIALIZATION & EVENT LISTENERS
@@ -193,30 +298,47 @@ document.addEventListener('DOMContentLoaded', () => {
             triggerProcess();
         });
 
-        // Adjustments & Filters
+        // Adjustments & Filters (Instant 60FPS CSS filter preview + debounced sync)
         elements.brightnessSlider.addEventListener('input', (e) => {
             state.brightness = parseInt(e.target.value);
             elements.brightnessValueBadge.value = state.brightness;
+            updateLiveCanvasFilter();
             triggerProcess();
         });
         elements.contrastSlider.addEventListener('input', (e) => {
             state.contrast = parseInt(e.target.value);
             elements.contrastValueBadge.value = state.contrast;
+            updateLiveCanvasFilter();
             triggerProcess();
         });
         elements.saturationSlider.addEventListener('input', (e) => {
             state.saturation = parseInt(e.target.value);
             elements.saturationValueBadge.value = state.saturation;
+            updateLiveCanvasFilter();
             triggerProcess();
         });
         elements.sharpnessSlider.addEventListener('input', (e) => {
             state.sharpness = parseInt(e.target.value);
             elements.sharpnessValueBadge.value = state.sharpness;
+            updateLiveCanvasFilter();
             triggerProcess();
         });
         elements.blurSlider.addEventListener('input', (e) => {
             state.blur = parseInt(e.target.value);
             elements.blurValueBadge.value = state.blur;
+            updateLiveCanvasFilter();
+            triggerProcess();
+        });
+        elements.temperatureSlider.addEventListener('input', (e) => {
+            state.temperature = parseInt(e.target.value);
+            elements.temperatureValueBadge.value = state.temperature;
+            updateLiveCanvasFilter();
+            triggerProcess();
+        });
+        elements.vignetteSlider.addEventListener('input', (e) => {
+            state.vignette = parseInt(e.target.value);
+            elements.vignetteValueBadge.value = state.vignette;
+            updateLiveCanvasFilter();
             triggerProcess();
         });
 
@@ -228,6 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 val = Math.max(min, Math.min(max, val));
                 state[stateKey] = val;
                 sliderEl.value = val;
+                updateLiveCanvasFilter();
                 triggerProcess();
             });
             badgeEl.addEventListener('blur', (e) => {
@@ -238,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.target.value = val;
                 state[stateKey] = val;
                 sliderEl.value = val;
+                updateLiveCanvasFilter();
                 triggerProcess();
             });
         }
@@ -246,6 +370,8 @@ document.addEventListener('DOMContentLoaded', () => {
         bindBadgeInput(elements.saturationValueBadge, elements.saturationSlider, 'saturation', 0, 200);
         bindBadgeInput(elements.sharpnessValueBadge, elements.sharpnessSlider, 'sharpness', 0, 200);
         bindBadgeInput(elements.blurValueBadge, elements.blurSlider, 'blur', 0, 20);
+        bindBadgeInput(elements.temperatureValueBadge, elements.temperatureSlider, 'temperature', -100, 100);
+        bindBadgeInput(elements.vignetteValueBadge, elements.vignetteSlider, 'vignette', 0, 100);
 
         elements.filterPresets.addEventListener('click', (e) => {
             const btn = e.target.closest('.preset-btn');
@@ -253,18 +379,22 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.filterPresets.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             state.filterType = btn.dataset.filter;
+            updateLiveCanvasFilter();
             triggerProcess();
         });
         elements.btnResetAdjust.addEventListener('click', () => {
             state.brightness = 100; state.contrast = 100; state.saturation = 100;
-            state.sharpness = 100; state.blur = 0; state.filterType = 'none';
+            state.sharpness = 100; state.blur = 0; state.temperature = 0; state.vignette = 0; state.filterType = 'none';
             elements.brightnessSlider.value = 100; elements.brightnessValueBadge.value = 100;
             elements.contrastSlider.value = 100; elements.contrastValueBadge.value = 100;
             elements.saturationSlider.value = 100; elements.saturationValueBadge.value = 100;
             elements.sharpnessSlider.value = 100; elements.sharpnessValueBadge.value = 100;
             elements.blurSlider.value = 0; elements.blurValueBadge.value = 0;
+            elements.temperatureSlider.value = 0; elements.temperatureValueBadge.value = 0;
+            elements.vignetteSlider.value = 0; elements.vignetteValueBadge.value = 0;
             elements.filterPresets.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
             elements.filterPresets.querySelector('[data-filter="none"]').classList.add('active');
+            updateLiveCanvasFilter();
             triggerProcess();
         });
 
@@ -372,6 +502,41 @@ document.addEventListener('DOMContentLoaded', () => {
             triggerProcess();
         });
 
+        // Zoom Controls
+        if (elements.btnZoomIn) {
+            elements.btnZoomIn.addEventListener('click', () => {
+                updateZoom(state.zoom + 0.15);
+            });
+        }
+        if (elements.btnZoomOut) {
+            elements.btnZoomOut.addEventListener('click', () => {
+                updateZoom(state.zoom - 0.15);
+            });
+        }
+        if (elements.btnZoomReset) {
+            elements.btnZoomReset.addEventListener('click', () => {
+                updateZoom(1.0);
+            });
+        }
+
+        if (elements.canvasContainer) {
+            elements.canvasContainer.addEventListener('wheel', (e) => {
+                if (!state.img) return;
+                if (e.ctrlKey || e.metaKey || e.altKey) {
+                    e.preventDefault();
+                    const delta = e.deltaY < 0 ? 0.15 : -0.15;
+                    updateZoom(state.zoom + delta);
+                }
+            }, { passive: false });
+        }
+
+        if (elements.btnFullscreen) {
+            elements.btnFullscreen.addEventListener('click', toggleFullscreen);
+        }
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
         // View Mode
         elements.viewModeCrop.addEventListener('click', () => {
             state.isComparing = false;
@@ -407,6 +572,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
         initCropperOverlayEvents();
         initComparisonSliderEvents();
+        initAnnotationEvents();
+        initBlenderEvents();
+        loadSavedTheme();
+        initThemeCustomizerEvents();
+    }
+
+    function toggleFullscreen() {
+        const elem = elements.canvasViewport || document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
+        }
+    }
+
+    function handleFullscreenChange() {
+        const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        if (elements.btnFullscreen) {
+            elements.btnFullscreen.innerHTML = isFS ? '<i class="fa-solid fa-compress"></i>' : '<i class="fa-solid fa-expand"></i>';
+            elements.btnFullscreen.title = isFS ? 'Exit Full Screen' : 'Toggle Full Screen';
+        }
+    }
+
+    function updateZoom(newZoom) {
+        if (newZoom !== undefined) {
+            state.zoom = Math.max(0.25, Math.min(4.0, newZoom));
+        }
+        const zoomPct = Math.round(state.zoom * 100);
+        if (elements.zoomLevel) {
+            elements.zoomLevel.textContent = zoomPct + '%';
+        }
+        if (elements.canvasWorkspace) {
+            elements.canvasWorkspace.style.transform = `scale(${state.zoom})`;
+            elements.canvasWorkspace.style.transformOrigin = 'center center';
+        }
+        if (elements.comparisonContainer) {
+            elements.comparisonContainer.style.transform = `scale(${state.zoom})`;
+            elements.comparisonContainer.style.transformOrigin = 'center center';
+        }
     }
 
     // ==========================================
@@ -484,6 +696,8 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.btnSaveToDisk.disabled = false;
         elements.btnAddToBatch.disabled = false;
         
+        state.annotation.history = [];
+        updateZoom(1.0);
         resetCropBox();
         renderWorkspace();
         triggerProcess();
@@ -491,17 +705,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetCropBox() {
         if (!state.img) return;
+        const is90or270 = (Math.abs(state.rotateAngle) % 180) === 90;
+        const cw = is90or270 ? state.origHeight : state.origWidth;
+        const ch = is90or270 ? state.origWidth : state.origHeight;
+
         state.cropBox = {
             x: 0,
             y: 0,
-            w: state.origWidth,
-            h: state.origHeight
+            w: cw,
+            h: ch
         };
         applyRatioToCropBox();
     }
 
     function applyRatioToCropBox() {
         if (!state.img || state.ratio === 'free') return;
+
+        const is90or270 = (Math.abs(state.rotateAngle) % 180) === 90;
+        const cw = is90or270 ? state.origHeight : state.origWidth;
+        const ch = is90or270 ? state.origWidth : state.origHeight;
 
         const parts = state.ratio.split(':');
         const rw = parseFloat(parts[0]);
@@ -511,17 +733,63 @@ document.addEventListener('DOMContentLoaded', () => {
         let w = state.cropBox.w;
         let h = w / targetRatio;
 
-        if (h > state.origHeight) {
-            h = state.origHeight;
+        if (h > ch) {
+            h = ch;
             w = h * targetRatio;
         }
 
         state.cropBox.w = Math.round(w);
         state.cropBox.h = Math.round(h);
-        state.cropBox.x = Math.max(0, Math.round((state.origWidth - w) / 2));
-        state.cropBox.y = Math.max(0, Math.round((state.origHeight - h) / 2));
+        state.cropBox.x = Math.max(0, Math.round((cw - w) / 2));
+        state.cropBox.y = Math.max(0, Math.round((ch - h) / 2));
 
         updateOverlayStyle();
+    }
+
+    function updateLiveCanvasFilter() {
+        if (!elements.mainCanvas) return;
+        
+        let filters = [];
+        
+        if (state.brightness !== 100) {
+            filters.push(`brightness(${state.brightness}%)`);
+        }
+        if (state.contrast !== 100) {
+            filters.push(`contrast(${state.contrast}%)`);
+        }
+        if (state.saturation !== 100) {
+            filters.push(`saturate(${state.saturation}%)`);
+        }
+        if (state.sharpness !== 100) {
+            const contrastBoost = 100 + (state.sharpness - 100) * 0.25;
+            filters.push(`contrast(${contrastBoost.toFixed(1)}%)`);
+        }
+        if (state.blur > 0) {
+            filters.push(`blur(${state.blur}px)`);
+        }
+        if (state.temperature !== 0) {
+            if (state.temperature > 0) {
+                filters.push(`sepia(${state.temperature * 0.3}%)`);
+                filters.push(`saturate(${100 + state.temperature * 0.2}%)`);
+            } else {
+                filters.push(`hue-rotate(${state.temperature * 0.5}deg)`);
+            }
+        }
+        if (state.filterType === 'grayscale') {
+            filters.push('grayscale(100%)');
+        } else if (state.filterType === 'sepia') {
+            filters.push('sepia(100%)');
+        } else if (state.filterType === 'invert') {
+            filters.push('invert(100%)');
+        } else if (state.filterType === 'doc_scan') {
+            filters.push('contrast(160%)', 'grayscale(80%)');
+        }
+
+        const filterStr = filters.length > 0 ? filters.join(' ') : 'none';
+        elements.mainCanvas.style.filter = filterStr;
+        if (elements.imgAfter) {
+            elements.imgAfter.style.filter = filterStr;
+        }
     }
 
     // ==========================================
@@ -531,27 +799,108 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderWorkspace() {
         if (!state.img) return;
 
-        elements.mainCanvas.width = state.origWidth;
-        elements.mainCanvas.height = state.origHeight;
+        const is90or270 = (Math.abs(state.rotateAngle) % 180) === 90;
+        const cw = is90or270 ? state.origHeight : state.origWidth;
+        const ch = is90or270 ? state.origWidth : state.origHeight;
+
+        elements.mainCanvas.width = cw;
+        elements.mainCanvas.height = ch;
 
         ctx.save();
-        ctx.clearRect(0, 0, state.origWidth, state.origHeight);
+        ctx.clearRect(0, 0, cw, ch);
 
-        // Center rotation
-        ctx.translate(state.origWidth / 2, state.origHeight / 2);
+        // Center rotation inside (cw, ch)
+        ctx.translate(cw / 2, ch / 2);
         ctx.rotate((state.rotateAngle * Math.PI) / 180);
         ctx.scale(state.flipH ? -1 : 1, state.flipV ? -1 : 1);
-        ctx.drawImage(state.img, -state.origWidth / 2, -state.origHeight / 2);
+
+        if (state.secondaryImg && state.blendConfig.mode === 'join') {
+            const dir = state.blendConfig.direction || 'horizontal';
+            const gap = state.blendConfig.gap || 0;
+
+            if (dir === 'vertical') {
+                const secW = state.origWidth;
+                const secH = Math.max(1, Math.round(state.secondaryImg.height * (secW / state.secondaryImg.width)));
+                elements.mainCanvas.height = state.origHeight + gap + secH;
+                ctx.clearRect(0, 0, elements.mainCanvas.width, elements.mainCanvas.height);
+
+                ctx.drawImage(state.img, -state.origWidth / 2, -state.origHeight / 2, state.origWidth, state.origHeight);
+                ctx.drawImage(state.secondaryImg, -state.origWidth / 2, state.origHeight / 2 + gap, secW, secH);
+            } else {
+                const secH = state.origHeight;
+                const secW = Math.max(1, Math.round(state.secondaryImg.width * (secH / state.secondaryImg.height)));
+                elements.mainCanvas.width = state.origWidth + gap + secW;
+                ctx.clearRect(0, 0, elements.mainCanvas.width, elements.mainCanvas.height);
+
+                ctx.drawImage(state.img, -state.origWidth / 2, -state.origHeight / 2, state.origWidth, state.origHeight);
+                ctx.drawImage(state.secondaryImg, state.origWidth / 2 + gap, -state.origHeight / 2, secW, secH);
+            }
+        } else {
+            // Draw primary image
+            ctx.drawImage(state.img, -state.origWidth / 2, -state.origHeight / 2);
+
+            // Draw secondary image if loaded (Overlay or Fade)
+            if (state.secondaryImg) {
+                const mode = state.blendConfig.mode || 'overlay';
+                if (mode === 'overlay') {
+                    const scalePct = (state.blendConfig.scale || 30) / 100;
+                    const opacity = (state.blendConfig.opacity !== undefined ? state.blendConfig.opacity : 100) / 100;
+                    const pos = state.blendConfig.position || 'bottom-right';
+                    const margin = 20;
+
+                    const secW = Math.max(1, Math.round(state.origWidth * scalePct));
+                    const secH = Math.max(1, Math.round(state.secondaryImg.height * (secW / state.secondaryImg.width)));
+
+                    let x = -state.origWidth / 2 + margin;
+                    let y = -state.origHeight / 2 + margin;
+
+                    if (pos === 'top-right') {
+                        x = state.origWidth / 2 - secW - margin;
+                    } else if (pos === 'bottom-left') {
+                        y = state.origHeight / 2 - secH - margin;
+                    } else if (pos === 'center') {
+                        x = -secW / 2;
+                        y = -secH / 2;
+                    } else if (pos === 'bottom-right') {
+                        x = state.origWidth / 2 - secW - margin;
+                        y = state.origHeight / 2 - secH - margin;
+                    }
+
+                    ctx.save();
+                    ctx.globalAlpha = opacity;
+                    ctx.drawImage(state.secondaryImg, x, y, secW, secH);
+                    ctx.restore();
+                } else if (mode === 'fade') {
+                    const ratio = (state.blendConfig.fade_ratio || 50) / 100;
+                    const blendMode = state.blendConfig.blend_mode || 'normal';
+
+                    ctx.save();
+                    ctx.globalAlpha = ratio;
+
+                    if (blendMode === 'multiply') ctx.globalCompositeOperation = 'multiply';
+                    else if (blendMode === 'screen') ctx.globalCompositeOperation = 'screen';
+                    else if (blendMode === 'overlay') ctx.globalCompositeOperation = 'overlay';
+
+                    ctx.drawImage(state.secondaryImg, -state.origWidth / 2, -state.origHeight / 2, state.origWidth, state.origHeight);
+                    ctx.restore();
+                }
+            }
+        }
 
         ctx.restore();
 
+        redrawAnnotationCanvas();
         updateOverlayStyle();
+        updateLiveCanvasFilter();
     }
 
     function updateOverlayStyle() {
+        const is90or270 = (Math.abs(state.rotateAngle) % 180) === 90;
+        const cw = is90or270 ? state.origHeight : state.origWidth;
+
         const box = state.cropBox;
-        const cWidth = elements.mainCanvas.clientWidth || state.origWidth;
-        const scaleX = cWidth / state.origWidth;
+        const cWidth = elements.mainCanvas.clientWidth || cw;
+        const scaleX = cWidth / cw;
 
         elements.cropOverlay.style.left = (box.x * scaleX) + 'px';
         elements.cropOverlay.style.top = (box.y * scaleX) + 'px';
@@ -625,22 +974,432 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
+    // MARKUP & ANNOTATIONS ENGINE
+    // ==========================================
+
+    function redrawAnnotationCanvas() {
+        if (!elements.annotationCanvas || !state.img) return;
+
+        elements.annotationCanvas.width = state.origWidth;
+        elements.annotationCanvas.height = state.origHeight;
+
+        actx.clearRect(0, 0, state.origWidth, state.origHeight);
+
+        state.annotation.history.forEach(item => {
+            if (item.type === 'path' && item.points.length > 0) {
+                actx.save();
+                actx.strokeStyle = item.color;
+                actx.lineWidth = item.size;
+                actx.lineCap = 'round';
+                actx.lineJoin = 'round';
+
+                actx.beginPath();
+                actx.moveTo(item.points[0].x, item.points[0].y);
+                for (let i = 1; i < item.points.length; i++) {
+                    actx.lineTo(item.points[i].x, item.points[i].y);
+                }
+                actx.stroke();
+                actx.restore();
+            } else if (item.type === 'text') {
+                actx.save();
+                actx.fillStyle = item.color;
+                actx.font = `${item.size}px "${item.fontFamily}", sans-serif`;
+                actx.textAlign = 'center';
+                actx.textBaseline = 'middle';
+
+                actx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+                actx.shadowBlur = 6;
+                actx.shadowOffsetX = 2;
+                actx.shadowOffsetY = 2;
+
+                actx.fillText(item.text, item.x, item.y);
+                actx.restore();
+            } else if (item.type === 'sticker') {
+                actx.save();
+                actx.font = `${item.size}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+                actx.textAlign = 'center';
+                actx.textBaseline = 'middle';
+
+                actx.fillText(item.sticker, item.x, item.y);
+                actx.restore();
+            }
+        });
+    }
+
+    function getCombinedImageData() {
+        if (!state.img) return state.imgSrc;
+        if (state.annotation.history.length === 0) return state.imgSrc;
+
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = state.origWidth;
+        offCanvas.height = state.origHeight;
+        const offCtx = offCanvas.getContext('2d');
+
+        offCtx.drawImage(state.img, 0, 0);
+        offCtx.drawImage(elements.annotationCanvas, 0, 0);
+
+        return offCanvas.toDataURL('image/png');
+    }
+
+    function initAnnotationEvents() {
+        elements.annotationToolTabs.addEventListener('click', (e) => {
+            const btn = e.target.closest('.preset-btn');
+            if (!btn) return;
+            elements.annotationToolTabs.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const tool = btn.dataset.tool;
+            state.annotation.activeTool = tool;
+
+            elements.panelDrawControls.classList.toggle('hidden', tool !== 'draw');
+            elements.panelTextControls.classList.toggle('hidden', tool !== 'text');
+            elements.panelStickerControls.classList.toggle('hidden', tool !== 'sticker');
+
+            elements.annotationCanvas.className = '';
+            if (tool === 'draw') elements.annotationCanvas.classList.add('active-drawing');
+            else if (tool === 'text') elements.annotationCanvas.classList.add('active-text');
+            else if (tool === 'sticker') elements.annotationCanvas.classList.add('active-sticker');
+
+            elements.cropOverlay.style.pointerEvents = tool === 'select' ? 'auto' : 'none';
+        });
+
+        elements.btnUndoAnnotation.addEventListener('click', () => {
+            if (state.annotation.history.length > 0) {
+                state.annotation.history.pop();
+                redrawAnnotationCanvas();
+                triggerProcess();
+            }
+        });
+
+        elements.btnClearAnnotation.addEventListener('click', () => {
+            if (state.annotation.history.length > 0) {
+                state.annotation.history = [];
+                redrawAnnotationCanvas();
+                triggerProcess();
+            }
+        });
+
+        elements.brushSizeSlider.addEventListener('input', (e) => {
+            state.annotation.brushSize = parseInt(e.target.value);
+            elements.brushSizeBadge.textContent = state.annotation.brushSize + 'px';
+        });
+
+        elements.brushColorPicker.addEventListener('input', (e) => {
+            state.annotation.brushColor = e.target.value;
+            elements.colorPresetsGrid.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+        });
+
+        elements.colorPresetsGrid.addEventListener('click', (e) => {
+            const swatch = e.target.closest('.color-swatch');
+            if (!swatch) return;
+            elements.colorPresetsGrid.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+            swatch.classList.add('active');
+            state.annotation.brushColor = swatch.dataset.color;
+            elements.brushColorPicker.value = swatch.dataset.color;
+        });
+
+        elements.annotationTextInput.addEventListener('input', (e) => {
+            state.annotation.textContent = e.target.value;
+        });
+        elements.fontSizeInput.addEventListener('input', (e) => {
+            state.annotation.fontSize = parseInt(e.target.value) || 36;
+        });
+        elements.fontFamilySelect.addEventListener('change', (e) => {
+            state.annotation.fontFamily = e.target.value;
+        });
+        elements.textColorPicker.addEventListener('input', (e) => {
+            state.annotation.textColor = e.target.value;
+        });
+
+        elements.btnAddTextToCanvas.addEventListener('click', () => {
+            if (!state.img || !state.annotation.textContent) return;
+            state.annotation.history.push({
+                type: 'text',
+                text: state.annotation.textContent,
+                x: Math.round(state.origWidth / 2),
+                y: Math.round(state.origHeight / 2),
+                color: state.annotation.textColor,
+                size: state.annotation.fontSize,
+                fontFamily: state.annotation.fontFamily
+            });
+            redrawAnnotationCanvas();
+            triggerProcess();
+        });
+
+        elements.stickerSizeSlider.addEventListener('input', (e) => {
+            state.annotation.stickerSize = parseInt(e.target.value);
+            elements.stickerSizeBadge.textContent = state.annotation.stickerSize + 'px';
+        });
+
+        elements.stickerGrid.addEventListener('click', (e) => {
+            const btn = e.target.closest('.sticker-btn');
+            if (!btn) return;
+            elements.stickerGrid.querySelectorAll('.sticker-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.annotation.activeSticker = btn.dataset.sticker;
+        });
+
+        let isAnnotating = false;
+        let currentPath = null;
+
+        function getCanvasCoords(e) {
+            const rect = elements.annotationCanvas.getBoundingClientRect();
+            const scaleX = state.origWidth / rect.width;
+            const scaleY = state.origHeight / rect.height;
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            return {
+                x: Math.round((clientX - rect.left) * scaleX),
+                y: Math.round((clientY - rect.top) * scaleY)
+            };
+        }
+
+        function startAnnotation(e) {
+            if (!state.img) return;
+            const tool = state.annotation.activeTool;
+            if (tool === 'select') return;
+
+            const coords = getCanvasCoords(e);
+
+            if (tool === 'draw') {
+                isAnnotating = true;
+                currentPath = {
+                    type: 'path',
+                    color: state.annotation.brushColor,
+                    size: state.annotation.brushSize,
+                    points: [coords]
+                };
+                state.annotation.history.push(currentPath);
+                redrawAnnotationCanvas();
+            } else if (tool === 'text') {
+                if (!state.annotation.textContent) return;
+                state.annotation.history.push({
+                    type: 'text',
+                    text: state.annotation.textContent,
+                    x: coords.x,
+                    y: coords.y,
+                    color: state.annotation.textColor,
+                    size: state.annotation.fontSize,
+                    fontFamily: state.annotation.fontFamily
+                });
+                redrawAnnotationCanvas();
+                triggerProcess();
+            } else if (tool === 'sticker') {
+                state.annotation.history.push({
+                    type: 'sticker',
+                    sticker: state.annotation.activeSticker,
+                    x: coords.x,
+                    y: coords.y,
+                    size: state.annotation.stickerSize
+                });
+                redrawAnnotationCanvas();
+                triggerProcess();
+            }
+        }
+
+        function moveAnnotation(e) {
+            if (!isAnnotating || state.annotation.activeTool !== 'draw') return;
+            const coords = getCanvasCoords(e);
+            currentPath.points.push(coords);
+            redrawAnnotationCanvas();
+        }
+
+        function stopAnnotation() {
+            if (isAnnotating) {
+                isAnnotating = false;
+                currentPath = null;
+                triggerProcess();
+            }
+        }
+
+        elements.annotationCanvas.addEventListener('mousedown', startAnnotation);
+        elements.annotationCanvas.addEventListener('mousemove', moveAnnotation);
+        window.addEventListener('mouseup', stopAnnotation);
+
+        elements.annotationCanvas.addEventListener('touchstart', (e) => { startAnnotation(e); e.preventDefault(); });
+        elements.annotationCanvas.addEventListener('touchmove', (e) => { moveAnnotation(e); e.preventDefault(); });
+        window.addEventListener('touchend', stopAnnotation);
+    }
+
+    // ==========================================
+    // DUAL IMAGE BLENDER & JOINER LOGIC
+    // ==========================================
+
+    function initBlenderEvents() {
+        elements.btnUploadSecondary.addEventListener('click', () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.select_files().then(files => {
+                    if (files && files.length > 0) {
+                        fetch('/api/load_file?path=' + encodeURIComponent(files[0]))
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.image_data) {
+                                    state.secondaryFileName = data.filename;
+                                    elements.secFileName.textContent = data.filename;
+                                    elements.secInfo.classList.remove('hidden');
+                                    elements.btnUploadSecondary.classList.add('hidden');
+
+                                    state.secondaryImgSrc = data.image_data;
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        state.secondaryImg = img;
+                                        renderWorkspace();
+                                        triggerProcess();
+                                    };
+                                    img.src = state.secondaryImgSrc;
+                                }
+                            });
+                    }
+                });
+            } else {
+                elements.hiddenSecondaryFileInput.click();
+            }
+        });
+
+        elements.hiddenSecondaryFileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+                loadSecondaryFile(files[0]);
+            }
+        });
+
+        elements.btnClearSecondary.addEventListener('click', () => {
+            state.secondaryImg = null;
+            state.secondaryImgSrc = null;
+            state.secondaryFileName = '';
+            elements.secInfo.classList.add('hidden');
+            elements.btnUploadSecondary.classList.remove('hidden');
+            elements.hiddenSecondaryFileInput.value = '';
+            renderWorkspace();
+            triggerProcess();
+        });
+
+        // Mode Tabs
+        elements.blendModeTabs.addEventListener('click', (e) => {
+            const btn = e.target.closest('.mode-btn');
+            if (!btn) return;
+            elements.blendModeTabs.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const mode = btn.dataset.blend;
+            state.blendConfig.mode = mode;
+
+            elements.panelBlendOverlay.classList.toggle('hidden', mode !== 'overlay');
+            elements.panelBlendFade.classList.toggle('hidden', mode !== 'fade');
+            elements.panelBlendJoin.classList.toggle('hidden', mode !== 'join');
+
+            renderWorkspace();
+            triggerProcess();
+        });
+
+        // Overlay PIP Sliders & Buttons
+        elements.pipScaleSlider.addEventListener('input', (e) => {
+            state.blendConfig.scale = parseInt(e.target.value);
+            elements.pipScaleBadge.textContent = state.blendConfig.scale + '%';
+            renderWorkspace();
+            triggerProcess();
+        });
+
+        elements.pipOpacitySlider.addEventListener('input', (e) => {
+            state.blendConfig.opacity = parseInt(e.target.value);
+            elements.pipOpacityBadge.textContent = state.blendConfig.opacity + '%';
+            renderWorkspace();
+            triggerProcess();
+        });
+
+        elements.pipPositionGrid.addEventListener('click', (e) => {
+            const btn = e.target.closest('.pos-btn');
+            if (!btn) return;
+            elements.pipPositionGrid.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.blendConfig.position = btn.dataset.pos;
+            renderWorkspace();
+            triggerProcess();
+        });
+
+        // Fade Sliders & Select
+        elements.fadeRatioSlider.addEventListener('input', (e) => {
+            state.blendConfig.fade_ratio = parseInt(e.target.value);
+            elements.fadeRatioBadge.textContent = state.blendConfig.fade_ratio + '%';
+            renderWorkspace();
+            triggerProcess();
+        });
+
+        elements.selectBlendMode.addEventListener('change', (e) => {
+            state.blendConfig.blend_mode = e.target.value;
+            renderWorkspace();
+            triggerProcess();
+        });
+
+        // Join Direction & Gap Sliders
+        elements.btnJoinHorizontal.addEventListener('click', () => {
+            state.blendConfig.direction = 'horizontal';
+            elements.btnJoinHorizontal.classList.add('active');
+            elements.btnJoinVertical.classList.remove('active');
+            renderWorkspace();
+            triggerProcess();
+        });
+
+        elements.btnJoinVertical.addEventListener('click', () => {
+            state.blendConfig.direction = 'vertical';
+            elements.btnJoinVertical.classList.add('active');
+            elements.btnJoinHorizontal.classList.remove('active');
+            renderWorkspace();
+            triggerProcess();
+        });
+
+        elements.joinGapSlider.addEventListener('input', (e) => {
+            state.blendConfig.gap = parseInt(e.target.value);
+            elements.joinGapBadge.textContent = state.blendConfig.gap + 'px';
+            renderWorkspace();
+            triggerProcess();
+        });
+    }
+
+    function loadSecondaryFile(file) {
+        state.secondaryFileName = file.name;
+        elements.secFileName.textContent = file.name;
+        elements.secInfo.classList.remove('hidden');
+        elements.btnUploadSecondary.classList.add('hidden');
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            state.secondaryImgSrc = event.target.result;
+            const img = new Image();
+            img.onload = () => {
+                state.secondaryImg = img;
+                renderWorkspace();
+                triggerProcess();
+            };
+            img.src = state.secondaryImgSrc;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ==========================================
     // PROCESSING ENGINE & SERVER API
     // ==========================================
 
     let processTimeout = null;
+    let currentAbortController = null;
 
     function triggerProcess() {
         if (!state.img) return;
 
-        // Debounce to prevent lag during rapid slider movements
         clearTimeout(processTimeout);
-        processTimeout = setTimeout(executeProcessingPipeline, 120);
+        processTimeout = setTimeout(executeProcessingPipeline, 140);
     }
 
     function executeProcessingPipeline() {
+        if (currentAbortController) {
+            currentAbortController.abort();
+        }
+        currentAbortController = new AbortController();
+
         const payload = {
-            image_data: state.imgSrc,
+            image_data: getCombinedImageData(),
             crop_box: [state.cropBox.x, state.cropBox.y, state.cropBox.x + state.cropBox.w, state.cropBox.y + state.cropBox.h],
             rotate_angle: state.rotateAngle,
             flip_h: state.flipH,
@@ -657,16 +1416,22 @@ document.addEventListener('DOMContentLoaded', () => {
             saturation: state.saturation,
             sharpness: state.sharpness,
             blur: state.blur,
-            filter_type: state.filterType
+            temperature: state.temperature,
+            vignette: state.vignette,
+            filter_type: state.filterType,
+            secondary_image_data: state.secondaryImgSrc,
+            blend_config: state.secondaryImgSrc ? state.blendConfig : null
         };
 
         fetch('/api/process', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal: currentAbortController.signal
         })
         .then(res => res.json())
         .then(data => {
+            currentAbortController = null;
             if (data.error) {
                 console.error(data.error);
                 return;
@@ -683,7 +1448,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 setupComparison();
             }
         })
-        .catch(err => console.error("Processing error:", err));
+        .catch(err => {
+            if (err.name === 'AbortError') return;
+            console.error("Processing error:", err);
+        });
     }
 
     function updateMetricsUI(data) {
@@ -707,42 +1475,105 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // SIDE-BY-SIDE COMPARISON SLIDER
+    // SIDE-BY-SIDE COMPARISON SLIDER (Clip-Path Split)
     // ==========================================
 
+    function setComparisonSplit(percent) {
+        percent = Math.max(0, Math.min(100, percent));
+        if (elements.imgAfter) {
+            elements.imgAfter.style.clipPath = `inset(0 ${100 - percent}% 0 0)`;
+        }
+        if (elements.comparisonSliderBar) {
+            elements.comparisonSliderBar.style.left = percent + '%';
+        }
+    }
+
     function setupComparison() {
-        if (!state.imgSrc || !state.procB64) return;
+        if (!state.img || !state.imgSrc) return;
 
-        elements.imgBefore.src = state.imgSrc;
-        elements.imgAfter.src = state.procB64;
+        // Render clean original uncompressed image matching crop/rotate geometry for Before side
+        if (state.cropBox) {
+            const bw = Math.max(1, state.cropBox.w);
+            const bh = Math.max(1, state.cropBox.h);
+            const beforeCanvas = document.createElement('canvas');
+            beforeCanvas.width = bw;
+            beforeCanvas.height = bh;
+            const bctx = beforeCanvas.getContext('2d');
 
-        elements.afterWrapper.style.width = '50%';
-        elements.comparisonSliderBar.style.left = '50%';
+            bctx.save();
+            bctx.translate(bw / 2, bh / 2);
+            bctx.rotate((state.rotateAngle * Math.PI) / 180);
+            bctx.scale(state.flipH ? -1 : 1, state.flipV ? -1 : 1);
+            bctx.drawImage(
+                state.img,
+                state.cropBox.x, state.cropBox.y, bw, bh,
+                -bw / 2, -bh / 2, bw, bh
+            );
+            bctx.restore();
+            elements.imgBefore.src = beforeCanvas.toDataURL('image/png');
+        } else {
+            elements.imgBefore.src = state.imgSrc;
+        }
+
+        elements.imgAfter.src = state.procB64 ? state.procB64 : state.imgSrc;
+        
+        // Ensure Before side is clean original (unfiltered) and After side receives all live edits
+        elements.imgBefore.style.filter = 'none';
+        updateLiveCanvasFilter();
+
+        if (!state.procB64) {
+            triggerProcess();
+        }
+
+        setComparisonSplit(50);
     }
 
     function initComparisonSliderEvents() {
         let isSliding = false;
-
-        const slider = elements.comparisonSliderBar;
         const container = elements.comparisonContainer;
 
-        slider.addEventListener('mousedown', (e) => {
+        function updateSliderPos(clientX) {
+            if (!container) return;
+            const rect = container.getBoundingClientRect();
+            if (rect.width <= 0) return;
+
+            let offsetX = clientX - rect.left;
+            const pct = (offsetX / rect.width) * 100;
+            setComparisonSplit(pct);
+        }
+
+        container.addEventListener('mousedown', (e) => {
             isSliding = true;
+            updateSliderPos(e.clientX);
             e.preventDefault();
         });
 
         window.addEventListener('mousemove', (e) => {
             if (!isSliding) return;
-            const rect = container.getBoundingClientRect();
-            let offsetX = e.clientX - rect.left;
-            offsetX = Math.max(0, Math.min(rect.width, offsetX));
-
-            const pct = (offsetX / rect.width) * 100;
-            elements.afterWrapper.style.width = pct + '%';
-            slider.style.left = pct + '%';
+            updateSliderPos(e.clientX);
         });
 
-        window.addEventListener('mouseup', () => { isSliding = false; });
+        window.addEventListener('mouseup', () => {
+            isSliding = false;
+        });
+
+        // Touch Support
+        container.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                isSliding = true;
+                updateSliderPos(e.touches[0].clientX);
+            }
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (isSliding && e.touches.length > 0) {
+                updateSliderPos(e.touches[0].clientX);
+            }
+        });
+
+        window.addEventListener('touchend', () => {
+            isSliding = false;
+        });
     }
 
     // ==========================================
@@ -750,7 +1581,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
 
     function saveOutputImage() {
-        if (!state.procB64) return;
+        if (!state.img) {
+            alert("Please load an image first.");
+            return;
+        }
+
+        if (!state.procB64) {
+            executeProcessingPipeline();
+            setTimeout(saveOutputImage, 350);
+            return;
+        }
 
         const ext = state.format.toLowerCase();
         const defaultFilename = `${state.fileName}_optimized.${ext}`;
@@ -762,10 +1602,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         } else {
-            const link = document.createElement('a');
-            link.href = state.procB64;
-            link.download = defaultFilename;
-            link.click();
+            try {
+                // Convert Base64 data URL to binary Blob to bypass browser data URL download size limits
+                const parts = state.procB64.split(',');
+                const mimeMatch = parts[0].match(/:(.*?);/);
+                const mime = mimeMatch ? mimeMatch[1] : 'image/' + ext;
+                const bstr = atob(parts[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while (n--) {
+                    u8arr[n] = bstr.charCodeAt(n);
+                }
+                const blob = new Blob([u8arr], { type: mime });
+                const blobUrl = URL.createObjectURL(blob);
+
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = defaultFilename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            } catch (err) {
+                console.error("Save error:", err);
+                const link = document.createElement('a');
+                link.href = state.procB64;
+                link.download = defaultFilename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
         }
     }
 
@@ -875,6 +1741,146 @@ document.addEventListener('DOMContentLoaded', () => {
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // ==========================================
+    // UI THEME & GLASS CUSTOMIZER ENGINE
+    // ==========================================
+
+    const themeConfig = {
+        preset: 'cosmic',
+        accentColor: '#00f2fe',
+        blur: 20,
+        opacity: 45,
+        radius: 14
+    };
+
+    function loadSavedTheme() {
+        const saved = localStorage.getItem('pixelcompress_glass_theme');
+        if (saved) {
+            try {
+                Object.assign(themeConfig, JSON.parse(saved));
+            } catch (e) {
+                console.error("Error loading saved theme:", e);
+            }
+        }
+        applyThemeToDOM();
+    }
+
+    function saveThemeConfig() {
+        localStorage.setItem('pixelcompress_glass_theme', JSON.stringify(themeConfig));
+    }
+
+    function applyThemeToDOM() {
+        const root = document.documentElement;
+        root.style.setProperty('--glass-blur', themeConfig.blur + 'px');
+        root.style.setProperty('--glass-opacity', (themeConfig.opacity / 100).toString());
+        root.style.setProperty('--glass-radius', themeConfig.radius + 'px');
+        root.style.setProperty('--accent-cyan', themeConfig.accentColor);
+        
+        const hex = themeConfig.accentColor.replace('#', '');
+        if (hex.length === 6) {
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            root.style.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.35)`);
+        }
+
+        if (themeConfig.preset === 'obsidian') {
+            root.style.setProperty('--bg-dark', '#040407');
+            root.style.setProperty('--bg-mesh', 'radial-gradient(at 0% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.12) 0px, transparent 50%), #040407');
+        } else if (themeConfig.preset === 'emerald') {
+            root.style.setProperty('--bg-dark', '#04120c');
+            root.style.setProperty('--bg-mesh', 'radial-gradient(at 0% 0%, rgba(0, 230, 118, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(0, 242, 254, 0.1) 0px, transparent 50%), #04120c');
+        } else if (themeConfig.preset === 'diamond') {
+            root.style.setProperty('--bg-dark', '#0f172a');
+            root.style.setProperty('--bg-mesh', 'radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.12) 0px, transparent 50%), #0f172a');
+        } else {
+            root.style.setProperty('--bg-dark', '#090c15');
+            root.style.setProperty('--bg-mesh', 'radial-gradient(at 0% 0%, rgba(0, 242, 254, 0.12) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%), #090c15');
+        }
+
+        if (elements.themeBlurSlider) {
+            elements.themeBlurSlider.value = themeConfig.blur;
+            elements.blurValueBadgeUI.textContent = themeConfig.blur + 'px';
+            elements.themeOpacitySlider.value = themeConfig.opacity;
+            elements.opacityValueBadgeUI.textContent = themeConfig.opacity + '%';
+            elements.themeRadiusSlider.value = themeConfig.radius;
+            elements.radiusValueBadgeUI.textContent = themeConfig.radius + 'px';
+            elements.themeCustomColorPicker.value = themeConfig.accentColor;
+
+            elements.themePresetsGrid.querySelectorAll('.theme-card').forEach(card => {
+                card.classList.toggle('active', card.dataset.preset === themeConfig.preset);
+            });
+            elements.accentSwatchesGrid.querySelectorAll('.accent-swatch').forEach(swatch => {
+                swatch.classList.toggle('active', swatch.dataset.color.toLowerCase() === themeConfig.accentColor.toLowerCase());
+            });
+        }
+
+        saveThemeConfig();
+    }
+
+    function initThemeCustomizerEvents() {
+        if (!elements.btnThemeCustomizer) return;
+
+        elements.btnThemeCustomizer.addEventListener('click', () => {
+            elements.themeModalBackdrop.classList.remove('hidden');
+        });
+        elements.btnCloseThemeModal.addEventListener('click', () => {
+            elements.themeModalBackdrop.classList.add('hidden');
+        });
+        elements.btnApplyTheme.addEventListener('click', () => {
+            elements.themeModalBackdrop.classList.add('hidden');
+        });
+
+        elements.themePresetsGrid.addEventListener('click', (e) => {
+            const card = e.target.closest('.theme-card');
+            if (!card) return;
+            themeConfig.preset = card.dataset.preset;
+
+            if (themeConfig.preset === 'obsidian') themeConfig.accentColor = '#a855f7';
+            else if (themeConfig.preset === 'emerald') themeConfig.accentColor = '#00e676';
+            else if (themeConfig.preset === 'diamond') themeConfig.accentColor = '#38bdf8';
+            else themeConfig.accentColor = '#00f2fe';
+
+            applyThemeToDOM();
+        });
+
+        elements.accentSwatchesGrid.addEventListener('click', (e) => {
+            const swatch = e.target.closest('.accent-swatch');
+            if (!swatch) return;
+            themeConfig.accentColor = swatch.dataset.color;
+            applyThemeToDOM();
+        });
+
+        elements.themeCustomColorPicker.addEventListener('input', (e) => {
+            themeConfig.accentColor = e.target.value;
+            applyThemeToDOM();
+        });
+
+        elements.themeBlurSlider.addEventListener('input', (e) => {
+            themeConfig.blur = parseInt(e.target.value);
+            applyThemeToDOM();
+        });
+
+        elements.themeOpacitySlider.addEventListener('input', (e) => {
+            themeConfig.opacity = parseInt(e.target.value);
+            applyThemeToDOM();
+        });
+
+        elements.themeRadiusSlider.addEventListener('input', (e) => {
+            themeConfig.radius = parseInt(e.target.value);
+            applyThemeToDOM();
+        });
+
+        elements.btnResetThemeDefaults.addEventListener('click', () => {
+            themeConfig.preset = 'cosmic';
+            themeConfig.accentColor = '#00f2fe';
+            themeConfig.blur = 20;
+            themeConfig.opacity = 45;
+            themeConfig.radius = 14;
+            applyThemeToDOM();
+        });
     }
 
     // Start App

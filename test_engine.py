@@ -46,7 +46,7 @@ def test_engine():
     print(f"WebP OK: Size {res_webp['processed_size_bytes']} bytes, format {res_webp['format']}")
     assert res_webp['format'] == 'WEBP'
     
-    print("\n[5/6] Testing Exact Target Dimensions (1920x1080)...")
+    print("\n[5/7] Testing Exact Target Dimensions (1920x1080)...")
     res_dim = image_engine.process_image_full(
         img_source=test_path,
         exact_w=1920,
@@ -56,10 +56,54 @@ def test_engine():
     print(f"Exact Dimensions OK: Output size {res_dim['processed_width']}x{res_dim['processed_height']} px")
     assert res_dim['processed_width'] == 1920
     assert res_dim['processed_height'] == 1080
-    
-    print("\n[6/6] Cleaning up test artifacts...")
+
+    print("\n[6/8] Testing Temperature, Vignette, and Doc Scan Filters...")
+    res_filters = image_engine.process_image_full(
+        img_source=test_path,
+        temperature=30,
+        vignette=40,
+        filter_type='doc_scan',
+        format='JPEG'
+    )
+    print(f"Advanced Filters OK: Size {res_filters['processed_size_bytes']} bytes")
+    assert res_filters['processed_size_bytes'] > 0
+
+    print("\n[7/8] Testing Dual Image Blender & Joiner (Overlay, Fade, Join)...")
+    sec_img = Image.new('RGB', (400, 400), color=(255, 215, 0))
+    sec_path = "test_secondary.png"
+    sec_img.save(sec_path)
+
+    # Test PIP Overlay
+    res_overlay = image_engine.process_image_full(
+        img_source=test_path,
+        secondary_img=sec_path,
+        blend_config={'mode': 'overlay', 'scale': 30, 'opacity': 80, 'position': 'bottom-right'}
+    )
+    assert res_overlay['processed_size_bytes'] > 0
+
+    # Test Fade Blend
+    res_fade = image_engine.process_image_full(
+        img_source=test_path,
+        secondary_img=sec_path,
+        blend_config={'mode': 'fade', 'fade_ratio': 40, 'blend_mode': 'multiply'}
+    )
+    assert res_fade['processed_size_bytes'] > 0
+
+    # Test Side-by-Side Join
+    res_join = image_engine.process_image_full(
+        img_source=test_path,
+        secondary_img=sec_path,
+        blend_config={'mode': 'join', 'direction': 'horizontal', 'gap': 10}
+    )
+    print(f"Dual Image Blender OK: Overlay size {res_overlay['processed_width']}x{res_overlay['processed_height']}, Joined size {res_join['processed_width']}x{res_join['processed_height']} px")
+    assert res_join['processed_width'] == 1200 + 10 + 800 # 1200 + gap + scaled sec (400x800/400)
+    assert res_join['processed_height'] == 800
+
+    print("\n[Cleanup] Removing temporary test artifacts...")
     if os.path.exists(test_path):
         os.remove(test_path)
+    if os.path.exists(sec_path):
+        os.remove(sec_path)
         
     print("\nALL VERIFICATION TESTS PASSED SUCCESSFULLY! [OK]")
 
