@@ -1,0 +1,122 @@
+[
+  {
+    "id": "social_media",
+    "name": "Social Media",
+    "icon": "fa-hashtag",
+    "builtin": true,
+    "settings": {
+      "format": "JPEG",
+      "quality": 82,
+      "scalePercent": 100,
+      "maxW": 1080,
+      "brightness": 105,
+      "contrast": 108,
+      "saturation": 115,
+      "sharpness": 115,
+      "blur": 0,
+      "temperature": 8,
+      "vignette": 12,
+      "filterType": "none"
+    }
+  },
+  {
+    "id": "web_optimized",
+    "name": "Web Optimized",
+    "icon": "fa-globe",
+    "builtin": true,
+    "settings": {
+      "format": "WEBP",
+      "quality": 75,
+      "scalePercent": 100,
+      "maxW": null,
+      "brightness": 100,
+      "contrast": 100,
+      "saturation": 100,
+      "sharpness": 105,
+      "blur": 0,
+      "temperature": 0,
+      "vignette": 0,
+      "filterType": "none"
+    }
+  },
+  {
+    "id": "print_ready",
+    "name": "Print Ready",
+    "icon": "fa-print",
+    "builtin": true,
+    "settings": {
+      "format": "PNG",
+      "quality": 100,
+      "scalePercent": 100,
+      "maxW": null,
+      "brightness": 100,
+      "contrast": 100,
+      "saturation": 100,
+      "sharpness": 110,
+      "blur": 0,
+      "temperature": 0,
+      "vignette": 0,
+      "filterType": "none"
+    }
+  },
+  {
+    "id": "email_attachment",
+    "name": "Email",
+    "icon": "fa-envelope",
+    "builtin": true,
+    "settings": {
+      "format": "JPEG",
+      "quality": 62,
+      "scalePercent": 100,
+      "maxW": 800,
+      "brightness": 100,
+      "contrast": 100,
+      "saturation": 100,
+      "sharpness": 100,
+      "blur": 0,
+      "temperature": 0,
+      "vignette": 0,
+      "filterType": "none"
+    }
+  },
+  {
+    "id": "thumbnail",
+    "name": "Thumbnail",
+    "icon": "fa-image",
+    "builtin": true,
+    "settings": {
+      "format": "JPEG",
+      "quality": 70,
+      "scalePercent": 100,
+      "maxW": 256,
+      "brightness": 100,
+      "contrast": 105,
+      "saturation": 105,
+      "sharpness": 120,
+      "blur": 0,
+      "temperature": 0,
+      "vignette": 0,
+      "filterType": "none"
+    }
+  },
+  {
+    "id": "cinematic",
+    "name": "Cinematic",
+    "icon": "fa-film",
+    "builtin": true,
+    "settings": {
+      "format": "JPEG",
+      "quality": 88,
+      "scalePercent": 100,
+      "maxW": null,
+      "brightness": 92,
+      "contrast": 115,
+      "saturation": 85,
+      "sharpness": 108,
+      "blur": 0,
+      "temperature": -15,
+      "vignette": 35,
+      "filterType": "none"
+    }
+  }
+]

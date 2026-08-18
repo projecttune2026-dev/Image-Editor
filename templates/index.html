@@ -71,6 +71,22 @@
                 </div>
             </div>
 
+            <!-- Section 1.3: AI Magic Tools -->
+            <div class="control-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-wand-magic-sparkles"></i> AI Magic Tools</h3>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button class="btn btn-primary full-width" id="btnRemoveBG" disabled>
+                        <i class="fa-solid fa-eraser"></i> Remove Background (AI)
+                    </button>
+                    <button class="btn btn-secondary full-width" id="btnUpscale" disabled
+                        style="background: linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(79,172,254,0.15) 100%); border-color: rgba(168,85,247,0.5); color: #c084fc;">
+                        <i class="fa-solid fa-up-right-and-down-left-from-center"></i> 4× AI Upscale (EDSR)
+                    </button>
+                </div>
+            </div>
+
             <!-- Section 1.5: Adjustments & Filters -->
             <div class="control-card">
                 <div class="card-header">
@@ -477,6 +493,15 @@
             <!-- Main Canvas / Drop Zone -->
             <div class="canvas-container" id="canvasContainer">
                 
+                <!-- Global Workspace Processing / Loading Overlay -->
+                <div class="loading-overlay hidden" id="processingLoader">
+                    <div class="loading-spinner-box">
+                        <div class="glow-spinner"></div>
+                        <p class="loading-text" id="loaderText">Processing Image with AI...</p>
+                        <p class="loading-subtext">This might take a few seconds on CPU</p>
+                    </div>
+                </div>
+                
                 <!-- Drop Zone Overlay -->
                 <div class="drop-zone" id="dropZone">
                     <div class="drop-content">
@@ -580,6 +605,10 @@
             <div class="control-card">
                 <button class="btn btn-success full-width" id="btnSaveToDisk" disabled>
                     <i class="fa-solid fa-download"></i> Save Processed Image
+                </button>
+
+                <button class="btn btn-secondary full-width mt-2" id="btnCopyToClipboard" disabled>
+                    <i class="fa-solid fa-clipboard"></i> Copy to Clipboard
                 </button>
                 
                 <button class="btn btn-secondary full-width mt-2" id="btnAddToBatch" disabled>

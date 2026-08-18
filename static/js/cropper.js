@@ -230,6 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         metricFormat: document.getElementById('metricFormat'),
         metricQuality: document.getElementById('metricQuality'),
         btnAddToBatch: document.getElementById('btnAddToBatch'),
+        btnCopyToClipboard: document.getElementById('btnCopyToClipboard'),
         
         // Batch
         batchDrawer: document.getElementById('batchDrawer'),
@@ -239,7 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
         batchItemsContainer: document.getElementById('batchItemsContainer'),
         btnProcessBatch: document.getElementById('btnProcessBatch'),
         btnClearBatch: document.getElementById('btnClearBatch'),
-        btnOpenBatch: document.getElementById('btnOpenBatch')
+        btnOpenBatch: document.getElementById('btnOpenBatch'),
+        btnRemoveBG: document.getElementById('btnRemoveBG'),
+        btnUpscale: document.getElementById('btnUpscale'),
+        processingLoader: document.getElementById('processingLoader'),
+        loaderText: document.getElementById('loaderText')
     };
 
     const ctx = elements.mainCanvas.getContext('2d');
@@ -559,6 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Save & Batch Actions
         elements.btnQuickSave.addEventListener('click', saveOutputImage);
         elements.btnSaveToDisk.addEventListener('click', saveOutputImage);
+        elements.btnCopyToClipboard.addEventListener('click', copyToClipboard);
         elements.btnAddToBatch.addEventListener('click', addToBatch);
         
         elements.batchDrawerHeader.addEventListener('click', () => {
@@ -570,12 +576,108 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.btnClearBatch.addEventListener('click', clearBatch);
         elements.btnProcessBatch.addEventListener('click', processBatchZIP);
 
+        if (elements.btnRemoveBG) {
+            elements.btnRemoveBG.addEventListener('click', removeBackgroundAI);
+        }
+        if (elements.btnUpscale) {
+            elements.btnUpscale.addEventListener('click', upscaleAI);
+        }
+
         initCropperOverlayEvents();
         initComparisonSliderEvents();
         initAnnotationEvents();
         initBlenderEvents();
         loadSavedTheme();
         initThemeCustomizerEvents();
+    }
+
+    function upscaleAI() {
+        if (!state.imgSrc) return;
+
+        elements.processingLoader.classList.remove('hidden');
+        elements.loaderText.textContent = 'Upscaling 4× with EDSR AI... (downloading model on first use)';
+        if (elements.btnUpscale) elements.btnUpscale.disabled = true;
+        if (elements.btnRemoveBG) elements.btnRemoveBG.disabled = true;
+
+        fetch('/api/upscale', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image_data: state.imgSrc })
+        })
+        .then(res => res.json())
+        .then(data => {
+            elements.processingLoader.classList.add('hidden');
+            if (elements.btnUpscale) elements.btnUpscale.disabled = false;
+            if (elements.btnRemoveBG) elements.btnRemoveBG.disabled = false;
+
+            if (data.error) {
+                alert('Upscale error: ' + data.error);
+                return;
+            }
+
+            state.origSizeBytes = data.size_bytes;
+            state.imgSrc = data.image_data;
+
+            const img = new Image();
+            img.onload = () => {
+                state.img = img;
+                state.origWidth = img.width;
+                state.origHeight = img.height;
+                onImageLoaded();
+            };
+            img.src = state.imgSrc;
+        })
+        .catch(err => {
+            elements.processingLoader.classList.add('hidden');
+            if (elements.btnUpscale) elements.btnUpscale.disabled = false;
+            if (elements.btnRemoveBG) elements.btnRemoveBG.disabled = false;
+            console.error('Upscale error:', err);
+            alert('Error connecting to server for AI upscaling.');
+        });
+    }
+
+    function removeBackgroundAI() {
+        if (!state.imgSrc) return;
+        
+        elements.processingLoader.classList.remove('hidden');
+        elements.loaderText.textContent = "Removing background with AI...";
+        if (elements.btnRemoveBG) elements.btnRemoveBG.disabled = true;
+
+        fetch('/api/remove_bg', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image_data: state.imgSrc })
+        })
+        .then(res => res.json())
+        .then(data => {
+            elements.processingLoader.classList.add('hidden');
+            if (elements.btnRemoveBG) elements.btnRemoveBG.disabled = false;
+            
+            if (data.error) {
+                alert("Background removal error: " + data.error);
+                return;
+            }
+
+            state.origSizeBytes = data.size_bytes;
+            state.imgSrc = data.image_data;
+            state.format = 'PNG';
+            elements.selectFormat.value = 'PNG';
+            
+            const img = new Image();
+            img.onload = () => {
+                state.img = img;
+                state.origWidth = img.width;
+                state.origHeight = img.height;
+                onImageLoaded();
+            };
+            img.src = state.imgSrc;
+        })
+        .catch(err => {
+            elements.processingLoader.classList.add('hidden');
+            if (elements.btnRemoveBG) elements.btnRemoveBG.disabled = false;
+            console.error("Background removal error:", err);
+            alert("Error connecting to server for background removal.");
+        });
     }
 
     function toggleFullscreen() {
@@ -694,7 +796,10 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.canvasWorkspace.classList.remove('hidden');
         elements.btnQuickSave.disabled = false;
         elements.btnSaveToDisk.disabled = false;
+        elements.btnCopyToClipboard.disabled = false;
         elements.btnAddToBatch.disabled = false;
+        if (elements.btnRemoveBG) elements.btnRemoveBG.disabled = false;
+        if (elements.btnUpscale) elements.btnUpscale.disabled = false;
         
         state.annotation.history = [];
         updateZoom(1.0);
@@ -799,6 +904,32 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderWorkspace() {
         if (!state.img) return;
 
+        // Apply CSS filters to the main canvas to reflect adjustments in real-time
+        let filterStr = '';
+        if (state.brightness !== 100) filterStr += `brightness(${state.brightness}%) `;
+        if (state.contrast !== 100) filterStr += `contrast(${state.contrast}%) `;
+        if (state.saturation !== 100) filterStr += `saturate(${state.saturation}%) `;
+        if (state.blur > 0) filterStr += `blur(${state.blur}px) `;
+        
+        const filterType = (state.filterType || 'none').toLowerCase();
+        if (filterType === 'grayscale') {
+            filterStr += 'grayscale(100%) ';
+        } else if (filterType === 'sepia') {
+            filterStr += 'sepia(100%) ';
+        } else if (filterType === 'invert') {
+            filterStr += 'invert(100%) ';
+        } else if (filterType === 'doc_scan') {
+            filterStr += 'contrast(200%) grayscale(100%) ';
+        }
+        
+        if (state.temperature > 0) {
+            filterStr += `sepia(${state.temperature * 0.4}%) saturate(${100 + state.temperature * 0.2}%) `;
+        } else if (state.temperature < 0) {
+            filterStr += `hue-rotate(${state.temperature * 0.15}deg) saturate(${100 + state.temperature * 0.3}%) `;
+        }
+
+        elements.mainCanvas.style.filter = filterStr || 'none';
+
         const is90or270 = (Math.abs(state.rotateAngle) % 180) === 90;
         const cw = is90or270 ? state.origHeight : state.origWidth;
         const ch = is90or270 ? state.origWidth : state.origHeight;
@@ -838,6 +969,17 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Draw primary image
             ctx.drawImage(state.img, -state.origWidth / 2, -state.origHeight / 2);
+
+            // Draw Vignette overlay if configured
+            if (state.vignette && state.vignette > 0) {
+                const radius = Math.sqrt(Math.pow(state.origWidth / 2, 2) + Math.pow(state.origHeight / 2, 2));
+                const grad = ctx.createRadialGradient(0, 0, radius * 0.4, 0, 0, radius);
+                const opacity = state.vignette / 100;
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, `rgba(0,0,0,${opacity})`);
+                ctx.fillStyle = grad;
+                ctx.fillRect(-state.origWidth / 2, -state.origHeight / 2, state.origWidth, state.origHeight);
+            }
 
             // Draw secondary image if loaded (Overlay or Fade)
             if (state.secondaryImg) {
@@ -1042,6 +1184,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initAnnotationEvents() {
+        // Set initial pointer events state
+        elements.annotationCanvas.style.pointerEvents = 'none';
+        elements.cropOverlay.style.pointerEvents = 'auto';
+
         elements.annotationToolTabs.addEventListener('click', (e) => {
             const btn = e.target.closest('.preset-btn');
             if (!btn) return;
@@ -1059,6 +1205,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (tool === 'draw') elements.annotationCanvas.classList.add('active-drawing');
             else if (tool === 'text') elements.annotationCanvas.classList.add('active-text');
             else if (tool === 'sticker') elements.annotationCanvas.classList.add('active-sticker');
+
+            // Toggle pointer-events on annotation canvas
+            elements.annotationCanvas.style.pointerEvents = tool === 'select' ? 'none' : 'auto';
+            elements.canvasWorkspace.style.cursor = '';
 
             elements.cropOverlay.style.pointerEvents = tool === 'select' ? 'auto' : 'none';
         });
@@ -1141,6 +1291,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let isAnnotating = false;
         let currentPath = null;
+        let isDraggingAnnotation = false;
+        let draggedAnnotation = null;
+        let dragStartCoords = null;
 
         function getCanvasCoords(e) {
             const rect = elements.annotationCanvas.getBoundingClientRect();
@@ -1154,6 +1307,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 x: Math.round((clientX - rect.left) * scaleX),
                 y: Math.round((clientY - rect.top) * scaleY)
             };
+        }
+
+        function findAnnotationAt(x, y) {
+            // Loop backwards to select the top-most item first
+            for (let i = state.annotation.history.length - 1; i >= 0; i--) {
+                const item = state.annotation.history[i];
+                if (item.type === 'text') {
+                    const size = item.size || 30;
+                    const textLength = (item.text || '').length || 1;
+                    const textWidth = Math.max(size * 0.6 * textLength, 40);
+                    const halfW = textWidth / 2;
+                    const halfH = Math.max(size, 20) / 2;
+                    if (x >= item.x - halfW && x <= item.x + halfW &&
+                        y >= item.y - halfH && y <= item.y + halfH) {
+                        return item;
+                    }
+                } else if (item.type === 'sticker') {
+                    const size = item.size || 40;
+                    const halfW = Math.max(size, 30) / 2;
+                    const halfH = Math.max(size, 30) / 2;
+                    if (x >= item.x - halfW && x <= item.x + halfW &&
+                        y >= item.y - halfH && y <= item.y + halfH) {
+                        return item;
+                    }
+                } else if (item.type === 'path' && item.points && item.points.length > 0) {
+                    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                    item.points.forEach(p => {
+                        if (p.x < minX) minX = p.x;
+                        if (p.x > maxX) maxX = p.x;
+                        if (p.y < minY) minY = p.y;
+                        if (p.y > maxY) maxY = p.y;
+                    });
+                    const padding = (item.size || 5) + 15;
+                    if (x >= minX - padding && x <= maxX + padding &&
+                        y >= minY - padding && y <= maxY + padding) {
+                        return item;
+                    }
+                }
+            }
+            return null;
         }
 
         function startAnnotation(e) {
@@ -1200,13 +1393,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function moveAnnotation(e) {
-            if (!isAnnotating || state.annotation.activeTool !== 'draw') return;
+            const tool = state.annotation.activeTool;
+            if (tool === 'select') {
+                if (isDraggingAnnotation && draggedAnnotation) {
+                    const coords = getCanvasCoords(e);
+                    const dx = coords.x - dragStartCoords.x;
+                    const dy = coords.y - dragStartCoords.y;
+
+                    if (draggedAnnotation.type === 'path') {
+                        draggedAnnotation.points.forEach(p => {
+                            p.x += dx;
+                            p.y += dy;
+                        });
+                    } else {
+                        draggedAnnotation.x += dx;
+                        draggedAnnotation.y += dy;
+                    }
+
+                    dragStartCoords = coords;
+                    redrawAnnotationCanvas();
+                    triggerProcess();
+                    if (e.cancelable) e.preventDefault();
+                }
+                return;
+            }
+
+            if (!isAnnotating || tool !== 'draw') return;
             const coords = getCanvasCoords(e);
             currentPath.points.push(coords);
             redrawAnnotationCanvas();
+            if (e.cancelable) e.preventDefault();
         }
 
         function stopAnnotation() {
+            if (isDraggingAnnotation) {
+                isDraggingAnnotation = false;
+                draggedAnnotation = null;
+                triggerProcess();
+                return;
+            }
             if (isAnnotating) {
                 isAnnotating = false;
                 currentPath = null;
@@ -1214,12 +1439,61 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Click/Touch intercept on workspace for selection
+        elements.canvasWorkspace.addEventListener('mousedown', (e) => {
+            if (state.annotation.activeTool !== 'select') return;
+            const coords = getCanvasCoords(e);
+            const hit = findAnnotationAt(coords.x, coords.y);
+            if (hit) {
+                isDraggingAnnotation = true;
+                draggedAnnotation = hit;
+                dragStartCoords = coords;
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        }, true); // Capture phase
+
+        elements.canvasWorkspace.addEventListener('touchstart', (e) => {
+            if (state.annotation.activeTool !== 'select') return;
+            const coords = getCanvasCoords(e);
+            const hit = findAnnotationAt(coords.x, coords.y);
+            if (hit) {
+                isDraggingAnnotation = true;
+                draggedAnnotation = hit;
+                dragStartCoords = coords;
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        }, { capture: true, passive: false });
+
+        elements.canvasWorkspace.addEventListener('mousemove', (e) => {
+            if (state.annotation.activeTool !== 'select' || isDraggingAnnotation) return;
+            const coords = getCanvasCoords(e);
+            const hit = findAnnotationAt(coords.x, coords.y);
+            if (hit) {
+                elements.canvasWorkspace.style.cursor = 'move';
+            } else {
+                elements.canvasWorkspace.style.cursor = '';
+            }
+        });
+
+        // Annotation canvas events for drawing
         elements.annotationCanvas.addEventListener('mousedown', startAnnotation);
-        elements.annotationCanvas.addEventListener('mousemove', moveAnnotation);
+        window.addEventListener('mousemove', moveAnnotation);
         window.addEventListener('mouseup', stopAnnotation);
 
-        elements.annotationCanvas.addEventListener('touchstart', (e) => { startAnnotation(e); e.preventDefault(); });
-        elements.annotationCanvas.addEventListener('touchmove', (e) => { moveAnnotation(e); e.preventDefault(); });
+        elements.annotationCanvas.addEventListener('touchstart', (e) => {
+            startAnnotation(e);
+            if (isAnnotating) {
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('touchmove', (e) => {
+            moveAnnotation(e);
+            if (isAnnotating) {
+                e.preventDefault();
+            }
+        });
         window.addEventListener('touchend', stopAnnotation);
     }
 
@@ -1444,6 +1718,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             updateMetricsUI(data);
 
+            // ── Draw the processed result onto mainCanvas ──────────────────────
+            // This ensures scale, quality, filters, and all adjustments are
+            // visible on the main editing viewport, not just in split view.
+            const procImg = new Image();
+            procImg.onload = () => {
+                // Keep the canvas at the original loaded image's display dimensions.
+                // Draw the processed (possibly resized) image stretched to fill that
+                // space with nearest-neighbor (pixelated) interpolation — this matches
+                // what the split view shows and lets the user see quality/scale effects.
+                const dw = state.origWidth;
+                const dh = state.origHeight;
+                elements.mainCanvas.width = dw;
+                elements.mainCanvas.height = dh;
+                ctx.clearRect(0, 0, dw, dh);
+                ctx.imageSmoothingEnabled = false;   // nearest-neighbor → pixelation visible
+                ctx.drawImage(procImg, 0, 0, dw, dh);
+                ctx.imageSmoothingEnabled = true;    // restore for other drawing operations
+                // Clear any leftover CSS filter — the server has already baked
+                // brightness/contrast/saturation/blur into the returned pixels.
+                elements.mainCanvas.style.filter = 'none';
+            };
+            procImg.src = state.procB64;
+            // ──────────────────────────────────────────────────────────────────
+
             if (state.isComparing) {
                 setupComparison();
             }
@@ -1635,6 +1933,84 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function copyToClipboard() {
+        if (!state.img) {
+            alert('Please load an image first.');
+            return;
+        }
+
+        if (!state.procB64) {
+            executeProcessingPipeline();
+            setTimeout(copyToClipboard, 350);
+            return;
+        }
+
+        const btn = elements.btnCopyToClipboard;
+        const originalHTML = btn.innerHTML;
+        btn.disabled = true;
+
+        try {
+            // Convert base64 data URL to a PNG blob for the clipboard
+            const parts = state.procB64.split(',');
+            const bstr = atob(parts[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+
+            // Clipboard API requires image/png
+            const pngBlob = new Blob([u8arr], { type: 'image/png' });
+
+            // If the processed format isn't PNG, re-encode to PNG via an offscreen canvas
+            const needsReencode = state.format.toUpperCase() !== 'PNG';
+
+            const writeToClipboard = (blob) => {
+                navigator.clipboard.write([
+                    new ClipboardItem({ 'image/png': blob })
+                ]).then(() => {
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+                    btn.classList.remove('btn-secondary');
+                    btn.classList.add('btn-success');
+                    setTimeout(() => {
+                        btn.innerHTML = originalHTML;
+                        btn.classList.remove('btn-success');
+                        btn.classList.add('btn-secondary');
+                        btn.disabled = false;
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Clipboard write failed:', err);
+                    alert('Failed to copy image. Your browser may not support clipboard image writing.');
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                });
+            };
+
+            if (needsReencode) {
+                // Re-encode to PNG via a temporary canvas
+                const tmpImg = new Image();
+                tmpImg.onload = () => {
+                    const tmpCanvas = document.createElement('canvas');
+                    tmpCanvas.width = tmpImg.width;
+                    tmpCanvas.height = tmpImg.height;
+                    const tmpCtx = tmpCanvas.getContext('2d');
+                    tmpCtx.drawImage(tmpImg, 0, 0);
+                    tmpCanvas.toBlob((blob) => {
+                        writeToClipboard(blob);
+                    }, 'image/png');
+                };
+                tmpImg.src = state.procB64;
+            } else {
+                writeToClipboard(pngBlob);
+            }
+        } catch (err) {
+            console.error('Copy to clipboard error:', err);
+            alert('Failed to copy image to clipboard.');
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
+    }
+
     function addToBatch() {
         if (!state.imgSrc) return;
 
@@ -1698,39 +2074,48 @@ document.addEventListener('DOMContentLoaded', () => {
     function processBatchZIP() {
         if (state.batchQueue.length === 0) return;
 
-        const zip = new JSZip();
-        let completed = 0;
+        elements.processingLoader.classList.remove('hidden');
+        elements.loaderText.textContent = "Processing batch queue with parallel CPU threads...";
+        elements.btnProcessBatch.disabled = true;
 
-        state.batchQueue.forEach(item => {
-            const payload = {
-                image_data: item.src,
+        const payload = {
+            items: state.batchQueue.map(item => ({
+                name: item.name,
+                src: item.src
+            })),
+            settings: {
                 format: state.format,
                 quality: state.quality,
-                target_kb: state.targetKB,
+                target_kb: state.mode === 'target' ? state.targetKB : null,
                 scale_percent: state.scalePercent
-            };
+            }
+        };
 
-            fetch('/api/process', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(data => {
-                const b64Data = data.image_data.split(',')[1];
-                const ext = state.format.toLowerCase();
-                zip.file(`${item.name}_compressed.${ext}`, b64Data, { base64: true });
-                completed++;
-
-                if (completed === state.batchQueue.length) {
-                    zip.generateAsync({ type: 'blob' }).then(blob => {
-                        const link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = `Batch_Compressed_Images.zip`;
-                        link.click();
-                    });
-                }
-            });
+        fetch('/api/batch_process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(err => { throw new Error(err.error || "Batch process failed"); });
+            }
+            return res.blob();
+        })
+        .then(blob => {
+            elements.processingLoader.classList.add('hidden');
+            elements.btnProcessBatch.disabled = false;
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Batch_Optimized_Images.zip`;
+            link.click();
+        })
+        .catch(err => {
+            elements.processingLoader.classList.add('hidden');
+            elements.btnProcessBatch.disabled = false;
+            console.error("Batch processing error:", err);
+            alert("Batch processing failed: " + err.message);
         });
     }
 

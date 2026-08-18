@@ -2,7 +2,8 @@ import os
 import sys
 import base64
 import threading
-import webview
+import webbrowser
+import time
 from flask import Flask, render_template, request, jsonify, Response
 import image_engine
 
@@ -15,41 +16,74 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 
-class DesktopAPI:
-    """
-    Exposes native Windows desktop dialogues and operations to PyWebView JS context.
-    """
-    def select_files(self):
-        window = webview.windows[0] if webview.windows else None
-        files = window.create_file_dialog(
-            webview.OPEN_DIALOG,
-            allow_multiple=True,
-            file_types=('Image Files (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tiff)', 'All Files (*.*)')
-        )
-        return files
-
-    def save_file(self, b64_data, filename_default="optimized_image.jpg"):
-        window = webview.windows[0] if webview.windows else None
-        save_path = window.create_file_dialog(
-            webview.SAVE_DIALOG,
-            save_filename=filename_default,
-            file_types=('Image Files (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tiff)', 'All Files (*.*)')
-        )
-        if save_path:
-            if isinstance(save_path, (list, tuple)):
-                save_path = save_path[0]
-            
-            header, encoded = b64_data.split(',', 1)
-            raw_bytes = base64.b64decode(encoded)
-            with open(save_path, 'wb') as f:
-                f.write(raw_bytes)
-            return {"success": True, "path": save_path}
-        return {"success": False}
-
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+# ─── Presets ───────────────────────────────────────────────────────────────────
+import json
+PRESETS_PATH = os.path.join(os.path.dirname(__file__), 'presets.json')
+
+
+@app.route('/api/presets', methods=['GET'])
+def api_get_presets():
+    try:
+        with open(PRESETS_PATH, 'r', encoding='utf-8') as f:
+            presets = json.load(f)
+        return jsonify(presets)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/presets/save', methods=['POST'])
+def api_save_preset():
+    try:
+        data = request.json or {}
+        name = data.get('name', '').strip()
+        settings = data.get('settings', {})
+        if not name:
+            return jsonify({"error": "Preset name required"}), 400
+
+        with open(PRESETS_PATH, 'r', encoding='utf-8') as f:
+            presets = json.load(f)
+
+        # Replace existing custom preset with same name, or append
+        existing = next((i for i, p in enumerate(presets) if p.get('id') == f"custom_{name.lower().replace(' ','_')}"), None)
+        new_preset = {
+            "id": f"custom_{name.lower().replace(' ','_')}",
+            "name": name,
+            "icon": "fa-star",
+            "builtin": False,
+            "settings": settings
+        }
+        if existing is not None:
+            presets[existing] = new_preset
+        else:
+            presets.append(new_preset)
+
+        with open(PRESETS_PATH, 'w', encoding='utf-8') as f:
+            json.dump(presets, f, indent=2)
+
+        return jsonify({"success": True, "preset": new_preset})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/presets/delete', methods=['POST'])
+def api_delete_preset():
+    try:
+        data = request.json or {}
+        preset_id = data.get('id', '')
+        with open(PRESETS_PATH, 'r', encoding='utf-8') as f:
+            presets = json.load(f)
+        presets = [p for p in presets if p.get('id') != preset_id or p.get('builtin')]
+        with open(PRESETS_PATH, 'w', encoding='utf-8') as f:
+            json.dump(presets, f, indent=2)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/load_file', methods=['GET'])
@@ -142,6 +176,136 @@ def api_process():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/batch_process', methods=['POST'])
+def api_batch_process():
+    import io
+    import zipfile
+    from concurrent.futures import ThreadPoolExecutor
+    
+    try:
+        data = request.json or {}
+        items = data.get('items', [])
+        settings = data.get('settings', {})
+        
+        if not items:
+            return jsonify({"error": "No items provided"}), 400
+            
+        format_name = str(settings.get('format', 'JPEG')).upper()
+        quality = int(settings.get('quality', 85))
+        target_kb = int(settings.get('target_kb')) if settings.get('target_kb') else None
+        scale_percent = int(settings.get('scale_percent', 100))
+        
+        def process_single(item):
+            name = item.get('name', 'image')
+            img_src = item.get('src')
+            if not img_src:
+                return None
+            
+            res = image_engine.process_image_full(
+                img_source=img_src,
+                format=format_name,
+                quality=quality,
+                target_kb=target_kb,
+                scale_percent=scale_percent
+            )
+            
+            b64_data = res['image_data']
+            header, encoded = b64_data.split(',', 1)
+            raw_bytes = base64.b64decode(encoded)
+            
+            ext = format_name.lower()
+            filename = f"{name}_optimized.{ext}"
+            return filename, raw_bytes
+
+        processed_files = []
+        with ThreadPoolExecutor(max_workers=min(4, len(items))) as executor:
+            results = executor.map(process_single, items)
+            for r in results:
+                if r:
+                    processed_files.append(r)
+                    
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for filename, raw_bytes in processed_files:
+                zip_file.writestr(filename, raw_bytes)
+                
+        zip_buf.seek(0)
+        
+        return Response(
+            zip_buf.getvalue(),
+            mimetype='application/zip',
+            headers={"Content-Disposition": "attachment; filename=Batch_Optimized_Images.zip"}
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/remove_bg', methods=['POST'])
+def api_remove_bg():
+    import io
+    try:
+        data = request.json or {}
+        img_source = data.get('image_data')
+        if not img_source:
+            return jsonify({"error": "No image data provided"}), 400
+
+        # Load PIL image
+        img = image_engine.load_image(img_source)
+        # Process background removal
+        result_img = image_engine.remove_background(img)
+        
+        # Save output to bytes in PNG format to preserve transparency
+        buf = io.BytesIO()
+        result_img.save(buf, format='PNG')
+        out_bytes = buf.getvalue()
+        
+        b64_output = "data:image/png;base64," + base64.b64encode(out_bytes).decode('utf-8')
+        
+        return jsonify({
+            "image_data": b64_output,
+            "width": result_img.width,
+            "height": result_img.height,
+            "size_bytes": len(out_bytes)
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/upscale', methods=['POST'])
+def api_upscale():
+    import io
+    try:
+        data = request.json or {}
+        img_source = data.get('image_data')
+        if not img_source:
+            return jsonify({"error": "No image data provided"}), 400
+
+        img = image_engine.load_image(img_source)
+        result_img = image_engine.upscale_image(img, scale=4)
+
+        buf = io.BytesIO()
+        result_img.save(buf, format='JPEG', quality=92)
+        out_bytes = buf.getvalue()
+
+        b64_output = "data:image/jpeg;base64," + base64.b64encode(out_bytes).decode('utf-8')
+
+        return jsonify({
+            "image_data": b64_output,
+            "width": result_img.width,
+            "height": result_img.height,
+            "size_bytes": len(out_bytes)
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/download', methods=['POST'])
 def api_download():
     try:
@@ -164,28 +328,20 @@ def api_download():
         return jsonify({"error": str(e)}), 500
 
 
-def run_flask():
-    app.run(host='127.0.0.1', port=54321, debug=False, use_reloader=False)
+def open_browser():
+    # Wait briefly for Flask to spin up
+    time.sleep(1.0)
+    webbrowser.open('http://127.0.0.1:54321')
 
 
 def main():
-    # 1. Start Flask web server thread
-    server_thread = threading.Thread(target=run_flask)
-    server_thread.daemon = True
-    server_thread.start()
+    # Start browser opener thread
+    browser_thread = threading.Thread(target=open_browser)
+    browser_thread.daemon = True
+    browser_thread.start()
 
-    # 2. Launch PyWebView Desktop Window
-    api = DesktopAPI()
-    icon_path = os.path.join(os.path.dirname(__file__), 'app_icon.ico')
-    webview.create_window(
-        title='PixelCompress PRO - Image Compressor & Cropper',
-        url='http://127.0.0.1:54321',
-        width=1340,
-        height=880,
-        min_size=(1024, 700),
-        js_api=api
-    )
-    webview.start()
+    # Start Flask server directly in main thread
+    app.run(host='127.0.0.1', port=54321, debug=False, use_reloader=False)
 
 
 if __name__ == '__main__':

@@ -477,6 +477,140 @@ def compress_to_target_size(img, target_kb, format='JPEG', keep_exif=False):
     return encode_image(final_scaled, format=format, quality=5, keep_exif=keep_exif), 5, 10
 
 
+def remove_background(img):
+    """
+    Removes background from PIL Image using rembg.
+    If the image is excessively large, resizes it to a reasonable resolution
+    for running the model, then scales the mask back to keep the original quality.
+    """
+    from rembg import remove
+    
+    max_side = 2048
+    orig_w, orig_h = img.size
+    resized = False
+    
+    if orig_w > max_side or orig_h > max_side:
+        if orig_w > orig_h:
+            new_w = max_side
+            new_h = int(orig_h * (max_side / orig_w))
+        else:
+            new_h = max_side
+            new_w = int(orig_w * (max_side / orig_h))
+        img_input = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        resized = True
+    else:
+        img_input = img
+
+    # Run background removal
+    res_img = remove(img_input)
+    
+    if resized:
+        # Resize alpha mask back to original resolution and apply to original image
+        alpha_mask = res_img.split()[-1]
+        alpha_mask_orig = alpha_mask.resize((orig_w, orig_h), Image.Resampling.LANCZOS)
+        res_img = img.convert('RGBA')
+        res_img.putalpha(alpha_mask_orig)
+        
+    return res_img
+
+
+# ─── AI Upscaling Model Cache ─────────────────────────────────────────────────
+_sr_model = None
+_MODELS_DIR = os.path.join(os.path.dirname(__file__), 'models')
+
+# EDSR x4 model — downloaded from the official OpenCV model zoo on first use
+_EDSR_URL = (
+    "https://raw.githubusercontent.com/Saafke/EDSR_Tensorflow/"
+    "master/models/EDSR_x4.pb"
+)
+_EDSR_PATH = os.path.join(_MODELS_DIR, 'EDSR_x4.pb')
+
+
+def _get_sr_model():
+    """Download (once) and return the cached OpenCV DNN SuperRes EDSR x4 model."""
+    global _sr_model
+    if _sr_model is not None:
+        return _sr_model
+
+    import cv2
+    os.makedirs(_MODELS_DIR, exist_ok=True)
+
+    if not os.path.exists(_EDSR_PATH):
+        import requests
+        resp = requests.get(_EDSR_URL, timeout=60, stream=True)
+        resp.raise_for_status()
+        with open(_EDSR_PATH, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+    sr = cv2.dnn_superres.DnnSuperResImpl_create()
+    sr.readModel(_EDSR_PATH)
+    sr.setModel('edsr', 4)
+    _sr_model = sr
+    return _sr_model
+
+
+def upscale_image(img, scale=4):
+    """
+    AI-powered 4x upscaling using EDSR deep super-resolution via OpenCV DNN.
+    Tiles large images to stay within memory limits on CPU.
+    Input/output are PIL Images.
+    """
+    import cv2, numpy as np
+
+    # Cap input resolution — processing a 1024px image → 4096px output
+    max_input_side = 1024
+    orig_w, orig_h = img.size
+
+    if orig_w > max_input_side or orig_h > max_input_side:
+        if orig_w >= orig_h:
+            new_w = max_input_side
+            new_h = max(1, int(orig_h * (max_input_side / orig_w)))
+        else:
+            new_h = max_input_side
+            new_w = max(1, int(orig_w * (max_input_side / orig_h)))
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    sr = _get_sr_model()
+
+    # Convert PIL → BGR numpy
+    arr = np.array(img.convert('RGB'))
+    bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+
+    # Tile-based inference to handle larger images on CPU
+    tile = 256
+    pad = 4
+    h, w = bgr.shape[:2]
+    out_h, out_w = h * scale, w * scale
+    result = np.zeros((out_h, out_w, 3), dtype=np.uint8)
+
+    for y in range(0, h, tile):
+        for x in range(0, w, tile):
+            x1 = max(0, x - pad)
+            y1 = max(0, y - pad)
+            x2 = min(w, x + tile + pad)
+            y2 = min(h, y + tile + pad)
+
+            patch = bgr[y1:y2, x1:x2]
+            upscaled = sr.upsample(patch)
+
+            # Crop out the padding from the output tile
+            ox1 = (x - x1) * scale
+            oy1 = (y - y1) * scale
+            ox2 = ox1 + (min(x + tile, w) - x) * scale
+            oy2 = oy1 + (min(y + tile, h) - y) * scale
+
+            # Destination coordinates
+            dx1, dy1 = x * scale, y * scale
+            dx2 = dx1 + (min(x + tile, w) - x) * scale
+            dy2 = dy1 + (min(y + tile, h) - y) * scale
+
+            result[dy1:dy2, dx1:dx2] = upscaled[oy1:oy2, ox1:ox2]
+
+    rgb_result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(rgb_result)
+
+
 def process_image_full(img_source, crop_box=None, rotate_angle=0, flip_h=False, flip_v=False, scale_percent=100, max_w=None, max_h=None, exact_w=None, exact_h=None, format='JPEG', quality=85, target_kb=None, keep_exif=False, brightness=100, contrast=100, saturation=100, sharpness=100, blur=0, temperature=0, vignette=0, filter_type='none', secondary_img=None, blend_config=None):
     """
     Complete pipeline: load -> transform -> adjust/filter -> blend/stitch -> compress/target_size -> metrics & base64 output.
