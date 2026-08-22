@@ -47,7 +47,21 @@
         
         <!-- Left Sidebar Controls -->
         <aside class="control-sidebar custom-scrollbar">
-            
+
+            <!-- Preset Profiles Card -->
+            <div class="control-card" id="presetsCard">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-bolt"></i> Quick Presets</h3>
+                    <button class="tool-btn" id="btnSavePreset" title="Save current settings as preset" style="width:auto;padding:2px 8px;height:26px;font-size:0.75rem;">
+                        <i class="fa-solid fa-plus"></i> Save
+                    </button>
+                </div>
+                <div id="presetsGrid" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
+                    <!-- Preset chips injected by JS -->
+                    <span style="font-size:0.75rem;color:var(--text-muted);">Loading presets...</span>
+                </div>
+            </div>
+
             <!-- Section 1: Crop & Aspect Ratio -->
             <div class="control-card">
                 <div class="card-header">
