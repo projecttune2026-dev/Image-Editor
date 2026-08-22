@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+title: Image-Editor
+authors:
+  - family-names: "projecttune2026"
+    given-names: "dev"
+    orcid: "https://github.com/projecttune2026-dev"
+description: "A powerful, full-featured image editing and optimization web application with AI upscaling, background removal, batch processing, and professional filters."
+date-released: 2026-08-22
+repository-code: "https://github.com/projecttune2026-dev/Image-Editor"
+repository: "https://github.com/projecttune2026-dev/Image-Editor"
+keywords:
+  - image-editor
+  - image-processing
+  - web-application
+  - flask
+  - python
+  - upscaling
+  - background-removal
+  - batch-processing
+license: MIT
+version: 1.0.0
