@@ -1,3 +1,13 @@
+"""
+Image-Editor - Image Processing Engine
+Copyright © 2026 projecttune2026-dev
+Author: projecttune2026-dev
+Repository: https://github.com/projecttune2026-dev/Image-Editor
+
+This software is provided under the MIT License.
+See LICENSE file for details.
+"""
+
 import io
 import os
 import base64
