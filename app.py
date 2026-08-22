@@ -7,6 +7,16 @@ import time
 from flask import Flask, render_template, request, jsonify, Response
 import image_engine
 
+"""
+Image-Editor - Flask Web Application
+Copyright © 2026 projecttune2026-dev
+Author: projecttune2026-dev
+Repository: https://github.com/projecttune2026-dev/Image-Editor
+
+This software is provided under the MIT License.
+See LICENSE file for details.
+"""
+
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.config['SECRET_KEY'] = 'pixelcompress_secret_key_2026'
 
@@ -22,7 +32,7 @@ def index():
     return render_template('index.html')
 
 
-# ─── Presets ───────────────────────────────────────────────────────────────────
+# ─── Presets ──────────────────────────────────────────────────────────
 import json
 PRESETS_PATH = os.path.join(os.path.dirname(__file__), 'presets.json')
 
