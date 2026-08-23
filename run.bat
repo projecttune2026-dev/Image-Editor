@@ -1,4 +1,4 @@
-title PixelPerfect Pro
-echo off
+@echo off
+title Image-Editor Pro
 cd /d "%~dp0"
-"%~dp0venv\Scripts\pythonw.exe" "%~dp0app.py"
+"%~dp0venv\Scripts\python.exe" "%~dp0app.py"
