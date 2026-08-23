@@ -7,4 +7,5 @@ env/
 *.log 
 models/*.onnx
 .env
-presets.json
+presets.json".env" 
+".env" 
