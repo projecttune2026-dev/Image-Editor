@@ -665,76 +665,218 @@ def process_image_full(img_source, crop_box=None, rotate_angle=0, flip_h=False, 
     }
 
 
-def replace_background_ai(img, prompt="cyberpunk city background"):
+def generate_picture_background(target_w, target_h, key="studio"):
     """
-    AI Background Replacement:
+    Generates rich, photographic/artistic picture backgrounds:
+    Presets: 'beach', 'studio', 'cyberpunk', 'nature', 'mountains', 'bokeh'
+    """
+    from PIL import ImageDraw, ImageFilter, ImageOps
+    import math, random
+
+    key_lower = str(key).lower()
+    bg = Image.new('RGBA', (target_w, target_h))
+    draw = ImageDraw.Draw(bg)
+
+    if any(w in key_lower for w in ['beach', 'sunset', 'sun', 'ocean']):
+        # Sunset Beach picture: Gradient sky + Sun disk + Ocean waves
+        for y in range(target_h):
+            factor = y / float(target_h)
+            if factor < 0.6:  # Sky
+                sf = factor / 0.6
+                r = int(255 - sf * 40)
+                g = int(100 + sf * 50 - sf * 90)
+                b = int(120 - sf * 100)
+            else:  # Ocean water
+                of = (factor - 0.6) / 0.4
+                r = int(20 + of * 10)
+                g = int(30 + of * 40)
+                b = int(70 + of * 60)
+            draw.line([(0, y), (target_w, y)], fill=(r, g, b, 255))
+        
+        # Sun disk & horizon glow
+        sun_cx, sun_cy = int(target_w * 0.5), int(target_h * 0.52)
+        sun_r = int(min(target_w, target_h) * 0.14)
+        for r_i in range(sun_r, 0, -2):
+            draw.ellipse([sun_cx - r_i, sun_cy - r_i, sun_cx + r_i, sun_cy + r_i], fill=(255, 220, 150, 255))
+        # Horizon line light highlight
+        draw.line([(0, int(target_h * 0.6)), (target_w, int(target_h * 0.6))], fill=(255, 200, 140, 200), width=3)
+
+    elif any(w in key_lower for w in ['cyber', 'neon', 'city', 'tech']):
+        # Cyberpunk Neon Night picture: Dark tech canvas with glowing neon pink & cyan light orbs
+        for y in range(target_h):
+            factor = y / float(target_h)
+            r = int(12 + factor * 10)
+            g = int(10 + factor * 15)
+            b = int(28 + factor * 40)
+            draw.line([(0, y), (target_w, y)], fill=(r, g, b, 255))
+        
+        # Neon glowing light orbs
+        for (cx_pct, cy_pct, rad_pct, col) in [
+            (0.2, 0.3, 0.35, (0, 242, 254)),   # Neon Cyan
+            (0.8, 0.7, 0.4, (255, 0, 128)),    # Neon Magenta
+            (0.5, 0.2, 0.25, (138, 43, 226))   # Neon Purple
+        ]:
+            cx, cy = int(target_w * cx_pct), int(target_h * cy_pct)
+            rad = int(max(target_w, target_h) * rad_pct)
+            overlay = Image.new('RGBA', (target_w, target_h), (0, 0, 0, 0))
+            odraw = ImageDraw.Draw(overlay)
+            odraw.ellipse([cx - rad, cy - rad, cx + rad, cy + rad], fill=(col[0], col[1], col[2], 90))
+            overlay = overlay.filter(ImageFilter.GaussianBlur(max(1, rad // 2)))
+            bg = Image.alpha_composite(bg, overlay)
+            draw = ImageDraw.Draw(bg)
+
+    elif any(w in key_lower for w in ['nature', 'forest', 'green', 'park', 'tree']):
+        # Forest Nature Depth picture: Multi-tone forest foliage & warm sunbeam rays
+        for y in range(target_h):
+            factor = y / float(target_h)
+            r = int(15 + factor * 25)
+            g = int(45 + factor * 60)
+            b = int(25 + factor * 20)
+            draw.line([(0, y), (target_w, y)], fill=(r, g, b, 255))
+        
+        # Sunbeams & soft forest bokeh
+        overlay = Image.new('RGBA', (target_w, target_h), (0, 0, 0, 0))
+        odraw = ImageDraw.Draw(overlay)
+        for i in range(12):
+            bx = int(target_w * ((i * 0.08 + 0.1) % 1.0))
+            by = int(target_h * ((i * 0.12 + 0.15) % 0.8))
+            brad = int(min(target_w, target_h) * (0.06 + (i % 4) * 0.03))
+            odraw.ellipse([bx - brad, by - brad, bx + brad, by + brad], fill=(240, 255, 180, 70))
+        overlay = overlay.filter(ImageFilter.GaussianBlur(max(1, min(target_w, target_h) // 25)))
+        bg = Image.alpha_composite(bg, overlay)
+
+    elif any(w in key_lower for w in ['bokeh', 'abstract', 'lights']):
+        # Bokeh Lights picture: Deep velvet canvas with soft blurred glowing circles
+        for y in range(target_h):
+            factor = y / float(target_h)
+            r = int(20 + factor * 15)
+            g = int(15 + factor * 10)
+            b = int(35 + factor * 25)
+            draw.line([(0, y), (target_w, y)], fill=(r, g, b, 255))
+
+        overlay = Image.new('RGBA', (target_w, target_h), (0, 0, 0, 0))
+        odraw = ImageDraw.Draw(overlay)
+        colors = [(255, 180, 80), (230, 100, 200), (100, 200, 255), (255, 220, 130)]
+        for i in range(15):
+            cx = int(target_w * ((i * 0.13 + 0.05) % 1.0))
+            cy = int(target_h * ((i * 0.17 + 0.1) % 1.0))
+            rad = int(min(target_w, target_h) * (0.08 + (i % 5) * 0.04))
+            col = colors[i % len(colors)]
+            odraw.ellipse([cx - rad, cy - rad, cx + rad, cy + rad], fill=(col[0], col[1], col[2], 110))
+        overlay = overlay.filter(ImageFilter.GaussianBlur(max(1, min(target_w, target_h) // 20)))
+        bg = Image.alpha_composite(bg, overlay)
+
+    elif any(w in key_lower for w in ['mountain', 'mountains', 'lake']):
+        # Mountain Lake Twilight picture: Sky gradient + Mountain silhouettes + Lake
+        for y in range(target_h):
+            factor = y / float(target_h)
+            if factor < 0.55:  # Sky
+                r = int(45 + factor * 100)
+                g = int(35 + factor * 60)
+                b = int(80 + factor * 40)
+            else:  # Lake
+                of = (factor - 0.55) / 0.45
+                r = int(25 + of * 20)
+                g = int(30 + of * 30)
+                b = int(60 + of * 40)
+            draw.line([(0, y), (target_w, y)], fill=(r, g, b, 255))
+        
+        # Mountain silhouette peaks
+        peak_y = int(target_h * 0.55)
+        points = [(0, target_h)]
+        for x in range(0, target_w + 10, max(1, int(target_w / 10))):
+            h_var = int(target_h * 0.2 * math.sin(x * 0.02 + 1.2))
+            points.append((x, peak_y - abs(h_var)))
+        points.append((target_w, target_h))
+        draw.polygon(points, fill=(18, 20, 38, 255))
+
+    else:  # 'studio' or default
+        # Professional Studio Photography Backdrop: Vignette spotlight + backdrop floor edge
+        cx, cy = target_w // 2, int(target_h * 0.4)
+        max_dist = math.hypot(target_w, target_h) * 0.65
+        for y in range(target_h):
+            for x in range(0, target_w, 4):  # Step x by 4 for performance
+                dist = math.hypot(x - cx, y - cy)
+                factor = min(1.0, dist / max_dist)
+                # Soft studio lighting (warm white center to deep slate edge)
+                r = int(235 - factor * 135)
+                g = int(238 - factor * 130)
+                b = int(245 - factor * 120)
+                draw.rectangle([x, y, x + 3, y], fill=(r, g, b, 255))
+        # Subtle studio floor shadow line
+        floor_y = int(target_h * 0.82)
+        draw.line([(0, floor_y), (target_w, floor_y)], fill=(160, 165, 175, 120), width=2)
+
+    return bg
+
+
+def replace_background_ai(img, prompt="cyberpunk city background", bg_preset=None, bg_image=None):
+    """
+    AI & Photo Background Replacement:
     1. Extracts subject foreground using rembg.
-    2. Validates API key and attempts Gemini AI background generation.
-    3. Falls back to prompt-tailored studio background if API key is invalid/unauthorized.
-    4. Composites foreground over new background.
+    2. If custom `bg_image` is provided, resizes/fits it as background.
+    3. If `bg_preset` or custom key is provided (or Gemini API key unavailable), uses realistic photo background generator.
+    4. Validates API key and attempts Gemini AI background generation if requested.
+    5. Composites foreground over new background seamlessly.
     """
+    from PIL import ImageOps
+
     # 1. Remove background to get RGBA subject
     fg = remove_background(img)  # PIL RGBA
     if fg.mode != 'RGBA':
         fg = fg.convert('RGBA')
 
     target_w, target_h = fg.size
-
     bg = None
-    api_key = (os.environ.get('GEMINI_API_KEY') or '').strip()
 
-    # Valid Google AI Studio keys start with 'AIzaSy'
-    if api_key and api_key.startswith('AIza'):
+    # Option A: Custom User Uploaded Background Image
+    if bg_image is not None:
         try:
-            from google import genai
-            from google.genai import types
+            if isinstance(bg_image, str):
+                bg_pil = load_image(bg_image)
+            else:
+                bg_pil = bg_image
+            # Fit background image to match target dimensions cleanly
+            bg = ImageOps.fit(bg_pil.convert('RGBA'), (target_w, target_h), method=Image.Resampling.LANCZOS)
+        except Exception as e:
+            print(f"[Custom BG Image] Failed to load background picture: {e}")
 
-            client = genai.Client(api_key=api_key)
-            result = client.models.generate_images(
-                model='imagen-3.0-generate-002',
-                prompt=f"High resolution background: {prompt}, clean aesthetic, soft studio lighting",
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    aspect_ratio="1:1",
-                    output_mime_type="image/jpeg"
+    # Option B: Gemini AI Generation (if valid API key available & no custom picture provided)
+    if bg is None and bg_preset is None:
+        api_key = (os.environ.get('GEMINI_API_KEY') or '').strip()
+        if api_key and api_key.startswith('AIza'):
+            try:
+                from google import genai
+                from google.genai import types
+
+                client = genai.Client(api_key=api_key)
+                result = client.models.generate_images(
+                    model='imagen-3.0-generate-002',
+                    prompt=f"High resolution photo background: {prompt}, professional studio lighting",
+                    config=types.GenerateImagesConfig(
+                        number_of_images=1,
+                        aspect_ratio="1:1",
+                        output_mime_type="image/jpeg"
+                    )
                 )
-            )
-            if result.generated_images:
-                img_bytes = result.generated_images[0].image.image_bytes
-                bg = Image.open(io.BytesIO(img_bytes)).convert('RGBA')
-        except Exception as ex:
-            print(f"[Gemini Imagen] Note: {ex}")
-    else:
-        print("[Gemini AI] Note: Key does not start with AIzaSy. Using studio background fallback.")
+                if result.generated_images:
+                    img_bytes = result.generated_images[0].image.image_bytes
+                    bg = Image.open(io.BytesIO(img_bytes)).convert('RGBA')
+            except Exception as ex:
+                print(f"[Gemini Imagen] Note: {ex}")
 
-    # Procedural prompt-tailored background fallback
+    # Option C: High Resolution Photographic / Artistic Background Presets
     if bg is None:
-        p_lower = prompt.lower()
-        if any(w in p_lower for w in ['sunset', 'beach', 'warm', 'sun', 'orange']):
-            c_top, c_bot = (255, 94, 98), (40, 20, 60)
-        elif any(w in p_lower for w in ['cyber', 'neon', 'city', 'tech', 'blue', 'night']):
-            c_top, c_bot = (10, 24, 48), (0, 242, 254)
-        elif any(w in p_lower for w in ['nature', 'forest', 'green', 'park', 'tree']):
-            c_top, c_bot = (15, 52, 34), (40, 116, 80)
-        elif any(w in p_lower for w in ['studio', 'white', 'clean', 'light']):
-            c_top, c_bot = (240, 242, 245), (180, 185, 195)
-        else:
-            c_top, c_bot = (20, 30, 50), (60, 40, 90)
+        preset_key = bg_preset if bg_preset else prompt
+        bg = generate_picture_background(target_w, target_h, preset_key)
 
-        bg = Image.new('RGBA', (target_w, target_h))
-        from PIL import ImageDraw
-        draw = ImageDraw.Draw(bg)
-        for y in range(target_h):
-            factor = y / float(target_h)
-            r = int(c_top[0] + factor * (c_bot[0] - c_top[0]))
-            g = int(c_top[1] + factor * (c_bot[1] - c_top[1]))
-            b = int(c_top[2] + factor * (c_bot[2] - c_top[2]))
-            draw.line([(0, y), (target_w, y)], fill=(r, g, b, 255))
+    # Resize background to match foreground if needed
+    if bg.size != (target_w, target_h):
+        bg = bg.resize((target_w, target_h), Image.Resampling.LANCZOS).convert('RGBA')
+    elif bg.mode != 'RGBA':
+        bg = bg.convert('RGBA')
 
-    # Resize background to match foreground
-    bg = bg.resize((target_w, target_h), Image.Resampling.LANCZOS).convert('RGBA')
-
-    # Composite foreground on top of background using alpha channel
+    # Composite foreground on top of background using alpha mask
     bg.paste(fg, (0, 0), mask=fg.split()[3])
     return bg.convert('RGB')
 

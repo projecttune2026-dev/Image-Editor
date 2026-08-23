@@ -13,6 +13,14 @@ document.addEventListener('DOMContentLoaded', () => {
         origHeight: 0,
         origSizeBytes: 0,
         
+        // Undo / Redo History Stack
+        undoStack: [],
+        redoStack: [],
+
+        // Background Picture Replacer State
+        selectedBGPreset: 'studio',
+        customBGImageData: null,
+        
         // Transforms
         cropBox: { x: 0, y: 0, w: 0, h: 0 },
         ratio: 'free',
@@ -245,6 +253,13 @@ document.addEventListener('DOMContentLoaded', () => {
         btnUpscale: document.getElementById('btnUpscale'),
         btnReplaceBG: document.getElementById('btnReplaceBG'),
         inputBGPrompt: document.getElementById('inputBGPrompt'),
+        btnUndo: document.getElementById('btnUndo'),
+        btnRedo: document.getElementById('btnRedo'),
+        bgPicturePresets: document.getElementById('bgPicturePresets'),
+        inputCustomBG: document.getElementById('inputCustomBG'),
+        btnTriggerCustomBG: document.getElementById('btnTriggerCustomBG'),
+        customBGFileName: document.getElementById('customBGFileName'),
+        btnReplaceBGPic: document.getElementById('btnReplaceBGPic'),
         processingLoader: document.getElementById('processingLoader'),
         loaderText: document.getElementById('loaderText')
     };
@@ -588,6 +603,62 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.btnReplaceBG.addEventListener('click', replaceBackgroundAI);
         }
 
+        // Undo & Redo Handlers
+        if (elements.btnUndo) {
+            elements.btnUndo.addEventListener('click', undo);
+        }
+        if (elements.btnRedo) {
+            elements.btnRedo.addEventListener('click', redo);
+        }
+
+        // Global Undo / Redo Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                if (e.shiftKey) {
+                    redo();
+                } else {
+                    undo();
+                }
+                e.preventDefault();
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                redo();
+                e.preventDefault();
+            }
+        });
+
+        // Background Picture Preset Chips
+        if (elements.bgPicturePresets) {
+            elements.bgPicturePresets.addEventListener('click', (e) => {
+                const btn = e.target.closest('.preset-btn');
+                if (!btn) return;
+                elements.bgPicturePresets.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.selectedBGPreset = btn.dataset.bgpreset;
+            });
+        }
+
+        // Custom Background Picture Upload
+        if (elements.btnTriggerCustomBG && elements.inputCustomBG) {
+            elements.btnTriggerCustomBG.addEventListener('click', () => {
+                elements.inputCustomBG.click();
+            });
+            elements.inputCustomBG.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (elements.customBGFileName) elements.customBGFileName.textContent = file.name;
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        state.customBGImageData = evt.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        if (elements.btnReplaceBGPic) {
+            elements.btnReplaceBGPic.addEventListener('click', replaceBackgroundPicture);
+        }
+
         initCropperOverlayEvents();
         initComparisonSliderEvents();
         initAnnotationEvents();
@@ -596,8 +667,148 @@ document.addEventListener('DOMContentLoaded', () => {
         initThemeCustomizerEvents();
     }
 
+    // ==========================================
+    // UNDO / REDO HISTORY SYSTEM
+    // ==========================================
+    
+    function saveState() {
+        if (!state.imgSrc) return;
+        const snapshot = {
+            imgSrc: state.imgSrc,
+            origWidth: state.origWidth,
+            origHeight: state.origHeight,
+            origSizeBytes: state.origSizeBytes,
+            rotateAngle: state.rotateAngle,
+            flipH: state.flipH,
+            flipV: state.flipV,
+            scalePercent: state.scalePercent,
+            exactW: state.exactW,
+            exactH: state.exactH,
+            brightness: state.brightness,
+            contrast: state.contrast,
+            saturation: state.saturation,
+            sharpness: state.sharpness,
+            blur: state.blur,
+            temperature: state.temperature,
+            vignette: state.vignette,
+            filterType: state.filterType
+        };
+        state.undoStack.push(snapshot);
+        if (state.undoStack.length > 30) state.undoStack.shift();
+        state.redoStack = [];
+        updateUndoRedoButtons();
+    }
+
+    function updateUndoRedoButtons() {
+        if (elements.btnUndo) elements.btnUndo.disabled = state.undoStack.length === 0;
+        if (elements.btnRedo) elements.btnRedo.disabled = state.redoStack.length === 0;
+    }
+
+    function undo() {
+        if (state.undoStack.length === 0) return;
+        const currentState = {
+            imgSrc: state.imgSrc,
+            origWidth: state.origWidth,
+            origHeight: state.origHeight,
+            origSizeBytes: state.origSizeBytes,
+            rotateAngle: state.rotateAngle,
+            flipH: state.flipH,
+            flipV: state.flipV,
+            scalePercent: state.scalePercent,
+            exactW: state.exactW,
+            exactH: state.exactH,
+            brightness: state.brightness,
+            contrast: state.contrast,
+            saturation: state.saturation,
+            sharpness: state.sharpness,
+            blur: state.blur,
+            temperature: state.temperature,
+            vignette: state.vignette,
+            filterType: state.filterType
+        };
+        state.redoStack.push(currentState);
+
+        const prev = state.undoStack.pop();
+        applyStateSnapshot(prev);
+        updateUndoRedoButtons();
+    }
+
+    function redo() {
+        if (state.redoStack.length === 0) return;
+        const currentState = {
+            imgSrc: state.imgSrc,
+            origWidth: state.origWidth,
+            origHeight: state.origHeight,
+            origSizeBytes: state.origSizeBytes,
+            rotateAngle: state.rotateAngle,
+            flipH: state.flipH,
+            flipV: state.flipV,
+            scalePercent: state.scalePercent,
+            exactW: state.exactW,
+            exactH: state.exactH,
+            brightness: state.brightness,
+            contrast: state.contrast,
+            saturation: state.saturation,
+            sharpness: state.sharpness,
+            blur: state.blur,
+            temperature: state.temperature,
+            vignette: state.vignette,
+            filterType: state.filterType
+        };
+        state.undoStack.push(currentState);
+
+        const next = state.redoStack.pop();
+        applyStateSnapshot(next);
+        updateUndoRedoButtons();
+    }
+
+    function applyStateSnapshot(snapshot) {
+        state.imgSrc = snapshot.imgSrc;
+        state.origWidth = snapshot.origWidth;
+        state.origHeight = snapshot.origHeight;
+        state.origSizeBytes = snapshot.origSizeBytes;
+        state.rotateAngle = snapshot.rotateAngle;
+        state.flipH = snapshot.flipH;
+        state.flipV = snapshot.flipV;
+        state.scalePercent = snapshot.scalePercent;
+        state.exactW = snapshot.exactW;
+        state.exactH = snapshot.exactH;
+
+        state.brightness = snapshot.brightness;
+        state.contrast = snapshot.contrast;
+        state.saturation = snapshot.saturation;
+        state.sharpness = snapshot.sharpness;
+        state.blur = snapshot.blur;
+        state.temperature = snapshot.temperature;
+        state.vignette = snapshot.vignette;
+        state.filterType = snapshot.filterType;
+
+        if (elements.brightnessSlider) elements.brightnessSlider.value = state.brightness;
+        if (elements.brightnessValueBadge) elements.brightnessValueBadge.value = state.brightness;
+        if (elements.contrastSlider) elements.contrastSlider.value = state.contrast;
+        if (elements.contrastValueBadge) elements.contrastValueBadge.value = state.contrast;
+        if (elements.saturationSlider) elements.saturationSlider.value = state.saturation;
+        if (elements.saturationValueBadge) elements.saturationValueBadge.value = state.saturation;
+        if (elements.sharpnessSlider) elements.sharpnessSlider.value = state.sharpness;
+        if (elements.sharpnessValueBadge) elements.sharpnessValueBadge.value = state.sharpness;
+        if (elements.blurSlider) elements.blurSlider.value = state.blur;
+        if (elements.blurValueBadge) elements.blurValueBadge.value = state.blur;
+        if (elements.temperatureSlider) elements.temperatureSlider.value = state.temperature;
+        if (elements.temperatureValueBadge) elements.temperatureValueBadge.value = state.temperature;
+        if (elements.vignetteSlider) elements.vignetteSlider.value = state.vignette;
+        if (elements.vignetteValueBadge) elements.vignetteValueBadge.value = state.vignette;
+
+        const img = new Image();
+        img.onload = () => {
+            state.img = img;
+            onImageLoaded();
+        };
+        img.src = state.imgSrc;
+    }
+
     function upscaleAI() {
         if (!state.imgSrc) return;
+        saveState();
 
         elements.processingLoader.classList.remove('hidden');
         elements.loaderText.textContent = 'Upscaling 4× with EDSR AI... (downloading model on first use)';
@@ -643,6 +854,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function removeBackgroundAI() {
         if (!state.imgSrc) return;
+        saveState();
         
         elements.processingLoader.classList.remove('hidden');
         elements.loaderText.textContent = "Removing background with AI...";
@@ -687,6 +899,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function replaceBackgroundAI() {
         if (!state.imgSrc) return;
+        saveState();
         const promptText = elements.inputBGPrompt ? elements.inputBGPrompt.value.trim() : 'cyberpunk city background';
         
         elements.processingLoader.classList.remove('hidden');
@@ -725,6 +938,55 @@ document.addEventListener('DOMContentLoaded', () => {
             if (elements.btnReplaceBG) elements.btnReplaceBG.disabled = false;
             console.error("AI Background Replacement error:", err);
             alert("Error connecting to server for AI Background Replacement.");
+        });
+    }
+
+    function replaceBackgroundPicture() {
+        if (!state.imgSrc) return;
+        saveState();
+
+        const preset = state.selectedBGPreset || 'studio';
+        elements.processingLoader.classList.remove('hidden');
+        elements.loaderText.textContent = `Compositing subject onto ${state.customBGImageData ? 'custom picture' : preset} background...`;
+        if (elements.btnReplaceBGPic) elements.btnReplaceBGPic.disabled = true;
+
+        fetch('/api/replace_bg', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image_data: state.imgSrc,
+                bg_preset: preset,
+                bg_image: state.customBGImageData,
+                prompt: preset
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            elements.processingLoader.classList.add('hidden');
+            if (elements.btnReplaceBGPic) elements.btnReplaceBGPic.disabled = false;
+            
+            if (data.error) {
+                alert("Background Picture error: " + data.error);
+                return;
+            }
+
+            state.origSizeBytes = data.size_bytes;
+            state.imgSrc = data.image_data;
+            
+            const img = new Image();
+            img.onload = () => {
+                state.img = img;
+                state.origWidth = img.width;
+                state.origHeight = img.height;
+                onImageLoaded();
+            };
+            img.src = state.imgSrc;
+        })
+        .catch(err => {
+            elements.processingLoader.classList.add('hidden');
+            if (elements.btnReplaceBGPic) elements.btnReplaceBGPic.disabled = false;
+            console.error("Background Picture Replacement error:", err);
+            alert("Error connecting to server for Background Picture Replacement.");
         });
     }
 
@@ -851,7 +1113,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elements.btnRemoveBG) elements.btnRemoveBG.disabled = false;
         if (elements.btnUpscale) elements.btnUpscale.disabled = false;
         if (elements.btnReplaceBG) elements.btnReplaceBG.disabled = false;
+        if (elements.btnReplaceBGPic) elements.btnReplaceBGPic.disabled = false;
+        if (elements.btnTriggerCustomBG) elements.btnTriggerCustomBG.disabled = false;
         
+        updateUndoRedoButtons();
         state.annotation.history = [];
         updateZoom(1.0);
         resetCropBox();

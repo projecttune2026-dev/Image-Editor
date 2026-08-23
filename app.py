@@ -296,11 +296,19 @@ def api_replace_bg():
         data = request.json or {}
         img_source = data.get('image_data')
         prompt = data.get('prompt', 'cyberpunk city background')
+        bg_preset = data.get('bg_preset')
+        bg_image = data.get('bg_image')
+
         if not img_source:
             return jsonify({"error": "No image data provided"}), 400
 
         img = image_engine.load_image(img_source)
-        result_img = image_engine.replace_background_ai(img, prompt=prompt)
+        result_img = image_engine.replace_background_ai(
+            img,
+            prompt=prompt,
+            bg_preset=bg_preset,
+            bg_image=bg_image
+        )
 
         buf = io.BytesIO()
         result_img.save(buf, format='JPEG', quality=92)
