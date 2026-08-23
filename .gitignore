@@ -5,3 +5,6 @@ env/
 .venv/ 
 .vscode/ 
 *.log 
+models/*.onnx
+.env
+presets.json

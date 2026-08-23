@@ -263,6 +263,46 @@ body {
     font-weight: 600;
 }
 
+/* Quick Preset Chips */
+.quick-preset-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    white-space: nowrap;
+}
+.quick-preset-chip:hover {
+    background: rgba(0, 242, 254, 0.1);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    transform: translateY(-1px);
+}
+.quick-preset-chip.active {
+    background: linear-gradient(135deg, rgba(0,242,254,0.2), rgba(79,172,254,0.2));
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    font-weight: 600;
+    box-shadow: 0 0 8px rgba(0, 242, 254, 0.25);
+}
+.quick-preset-chip.custom-chip {
+    border-color: rgba(168, 85, 247, 0.4);
+    color: #c084fc;
+}
+.quick-preset-chip.custom-chip:hover {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: #a855f7;
+    color: #d8b4fe;
+}
+
+
 /* Transform Tools */
 .transform-actions {
     display: flex;

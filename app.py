@@ -4,6 +4,9 @@ import base64
 import threading
 import webbrowser
 import time
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, render_template, request, jsonify, Response
 import image_engine
 
@@ -274,6 +277,37 @@ def api_remove_bg():
         
         b64_output = "data:image/png;base64," + base64.b64encode(out_bytes).decode('utf-8')
         
+        return jsonify({
+            "image_data": b64_output,
+            "width": result_img.width,
+            "height": result_img.height,
+            "size_bytes": len(out_bytes)
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/replace_bg', methods=['POST'])
+def api_replace_bg():
+    import io
+    try:
+        data = request.json or {}
+        img_source = data.get('image_data')
+        prompt = data.get('prompt', 'cyberpunk city background')
+        if not img_source:
+            return jsonify({"error": "No image data provided"}), 400
+
+        img = image_engine.load_image(img_source)
+        result_img = image_engine.replace_background_ai(img, prompt=prompt)
+
+        buf = io.BytesIO()
+        result_img.save(buf, format='JPEG', quality=92)
+        out_bytes = buf.getvalue()
+
+        b64_output = "data:image/jpeg;base64," + base64.b64encode(out_bytes).decode('utf-8')
+
         return jsonify({
             "image_data": b64_output,
             "width": result_img.width,

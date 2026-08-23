@@ -243,6 +243,8 @@ document.addEventListener('DOMContentLoaded', () => {
         btnOpenBatch: document.getElementById('btnOpenBatch'),
         btnRemoveBG: document.getElementById('btnRemoveBG'),
         btnUpscale: document.getElementById('btnUpscale'),
+        btnReplaceBG: document.getElementById('btnReplaceBG'),
+        inputBGPrompt: document.getElementById('inputBGPrompt'),
         processingLoader: document.getElementById('processingLoader'),
         loaderText: document.getElementById('loaderText')
     };
@@ -582,6 +584,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elements.btnUpscale) {
             elements.btnUpscale.addEventListener('click', upscaleAI);
         }
+        if (elements.btnReplaceBG) {
+            elements.btnReplaceBG.addEventListener('click', replaceBackgroundAI);
+        }
 
         initCropperOverlayEvents();
         initComparisonSliderEvents();
@@ -679,6 +684,51 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Error connecting to server for background removal.");
         });
     }
+
+    function replaceBackgroundAI() {
+        if (!state.imgSrc) return;
+        const promptText = elements.inputBGPrompt ? elements.inputBGPrompt.value.trim() : 'cyberpunk city background';
+        
+        elements.processingLoader.classList.remove('hidden');
+        elements.loaderText.textContent = "Generating AI background with Gemini Imagen...";
+        if (elements.btnReplaceBG) elements.btnReplaceBG.disabled = true;
+
+        fetch('/api/replace_bg', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image_data: state.imgSrc, prompt: promptText || 'sunset beach' })
+        })
+        .then(res => res.json())
+        .then(data => {
+            elements.processingLoader.classList.add('hidden');
+            if (elements.btnReplaceBG) elements.btnReplaceBG.disabled = false;
+            
+            if (data.error) {
+                alert("AI Background error: " + data.error);
+                return;
+            }
+
+            state.origSizeBytes = data.size_bytes;
+            state.imgSrc = data.image_data;
+            
+            const img = new Image();
+            img.onload = () => {
+                state.img = img;
+                state.origWidth = img.width;
+                state.origHeight = img.height;
+                onImageLoaded();
+            };
+            img.src = state.imgSrc;
+        })
+        .catch(err => {
+            elements.processingLoader.classList.add('hidden');
+            if (elements.btnReplaceBG) elements.btnReplaceBG.disabled = false;
+            console.error("AI Background Replacement error:", err);
+            alert("Error connecting to server for AI Background Replacement.");
+        });
+    }
+
+
 
     function toggleFullscreen() {
         const elem = elements.canvasViewport || document.documentElement;
@@ -800,6 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.btnAddToBatch.disabled = false;
         if (elements.btnRemoveBG) elements.btnRemoveBG.disabled = false;
         if (elements.btnUpscale) elements.btnUpscale.disabled = false;
+        if (elements.btnReplaceBG) elements.btnReplaceBG.disabled = false;
         
         state.annotation.history = [];
         updateZoom(1.0);
@@ -2268,6 +2319,164 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ==========================================
+    // PRESET PROFILES ENGINE
+    // ==========================================
+
+    let _loadedPresets = [];
+
+    function loadPresets() {
+        fetch('/api/presets')
+            .then(r => r.json())
+            .then(presets => {
+                _loadedPresets = presets;
+                renderPresetsGrid(presets);
+            })
+            .catch(() => {
+                const grid = document.getElementById('presetsGrid');
+                if (grid) grid.innerHTML = '<span style="font-size:0.75rem;color:var(--text-muted);">Could not load presets.</span>';
+            });
+    }
+
+    function renderPresetsGrid(presets) {
+        const grid = document.getElementById('presetsGrid');
+        if (!grid) return;
+        grid.innerHTML = presets.map(p => `
+            <button class="quick-preset-chip ${!p.builtin ? 'custom-chip' : ''}"
+                    data-preset-id="${p.id}"
+                    title="${p.name}">
+                <i class="fa-solid ${p.icon || 'fa-star'}"></i>
+                ${p.name}
+            </button>
+        `).join('');
+
+        grid.querySelectorAll('.quick-preset-chip').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const pid = btn.dataset.presetId;
+                const preset = _loadedPresets.find(p => p.id === pid);
+                if (preset) applyPreset(preset, btn);
+            });
+        });
+    }
+
+    function applyPreset(preset, activeBtn) {
+        const s = preset.settings;
+
+        // — Format —
+        if (s.format) {
+            state.format = s.format;
+            const sel = document.getElementById('selectFormat');
+            if (sel) sel.value = s.format;
+        }
+
+        // — Quality —
+        if (s.quality !== undefined) {
+            state.quality = s.quality;
+            const qs = document.getElementById('qualitySlider');
+            const qb = document.getElementById('qualityValueBadge');
+            if (qs) qs.value = s.quality;
+            if (qb) qb.textContent = s.quality + '%';
+        }
+
+        // — Adjustments —
+        const sliderMap = {
+            brightness: ['brightnessSlider', 'brightnessValueBadge', '%'],
+            contrast:   ['contrastSlider',   'contrastValueBadge',   '%'],
+            saturation: ['saturationSlider',  'saturationValueBadge', '%'],
+            sharpness:  ['sharpnessSlider',   'sharpnessValueBadge',  '%'],
+            blur:       ['blurSlider',        'blurValueBadge',       'px'],
+            temperature:['temperatureSlider', 'temperatureValueBadge','°'],
+            vignette:   ['vignetteSlider',    'vignetteValueBadge',   '%'],
+        };
+        Object.entries(sliderMap).forEach(([key, [sliderId, badgeId]]) => {
+            if (s[key] !== undefined) {
+                state[key] = s[key];
+                const sl = document.getElementById(sliderId);
+                const ba = document.getElementById(badgeId);
+                if (sl) sl.value = s[key];
+                if (ba) ba.value !== undefined ? (ba.value = s[key]) : (ba.textContent = s[key]);
+            }
+        });
+
+        // — Filter —
+        if (s.filterType) {
+            state.filterType = s.filterType;
+            document.querySelectorAll('#filterPresets .preset-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.filter === s.filterType);
+            });
+        }
+
+        // Highlight active chip
+        document.querySelectorAll('.quick-preset-chip').forEach(b => b.classList.remove('active'));
+        if (activeBtn) activeBtn.classList.add('active');
+
+        renderWorkspace();
+        triggerProcess();
+
+        showPresetToast(`✅ Preset "${preset.name}" applied`);
+    }
+
+    function saveCurrentAsPreset() {
+        const name = prompt('Name for this preset:', '');
+        if (!name || !name.trim()) return;
+
+        const settings = {
+            format:      state.format,
+            quality:     state.quality,
+            scalePercent:state.scalePercent,
+            brightness:  state.brightness,
+            contrast:    state.contrast,
+            saturation:  state.saturation,
+            sharpness:   state.sharpness,
+            blur:        state.blur,
+            temperature: state.temperature,
+            vignette:    state.vignette,
+            filterType:  state.filterType,
+        };
+
+        fetch('/api/presets/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim(), settings })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert('Error: ' + data.error); return; }
+            loadPresets();
+            showPresetToast(`⭐ Preset "${name.trim()}" saved!`);
+        })
+        .catch(() => alert('Could not save preset.'));
+    }
+
+    function showPresetToast(msg) {
+        let toast = document.getElementById('presetToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'presetToast';
+            toast.style.cssText = `
+                position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+                background:var(--glass-bg); backdrop-filter:blur(16px);
+                border:1px solid var(--border-color); border-radius:24px;
+                padding:8px 18px; color:var(--text-primary); font-size:0.85rem;
+                z-index:9999; pointer-events:none; opacity:0;
+                transition:opacity 0.3s; white-space:nowrap;
+                box-shadow:0 4px 20px rgba(0,0,0,0.4);
+            `;
+            document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.style.opacity = '1';
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+    }
+
+    // Wire up Save Preset button
+    const btnSavePreset = document.getElementById('btnSavePreset');
+    if (btnSavePreset) btnSavePreset.addEventListener('click', saveCurrentAsPreset);
+
+    // Load presets on startup
+    loadPresets();
+
     // Start App
     initEvents();
-});
+});

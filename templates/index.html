@@ -98,6 +98,14 @@
                         style="background: linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(79,172,254,0.15) 100%); border-color: rgba(168,85,247,0.5); color: #c084fc;">
                         <i class="fa-solid fa-up-right-and-down-left-from-center"></i> 4× AI Upscale (EDSR)
                     </button>
+                    <div style="margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px;">
+                        <input type="text" id="inputBGPrompt" placeholder="New BG prompt (e.g. sunset beach)..."
+                               style="width:100%; padding:6px 10px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); font-size:0.75rem; margin-bottom:6px; box-sizing:border-box;">
+                        <button class="btn btn-secondary full-width" id="btnReplaceBG" disabled
+                            style="background: linear-gradient(135deg, rgba(0,242,254,0.15) 0%, rgba(168,85,247,0.15) 100%); border-color: rgba(0,242,254,0.5); color: var(--accent-cyan);">
+                            <i class="fa-solid fa-wand-magic"></i> Replace BG (Gemini AI)
+                        </button>
+                    </div>
                 </div>
             </div>
 

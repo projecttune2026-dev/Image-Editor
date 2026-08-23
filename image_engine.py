@@ -663,3 +663,79 @@ def process_image_full(img_source, crop_box=None, rotate_angle=0, flip_h=False, 
         "quality": achieved_quality,
         "scale": achieved_scale
     }
+
+
+def replace_background_ai(img, prompt="cyberpunk city background"):
+    """
+    AI Background Replacement:
+    1. Extracts subject foreground using rembg.
+    2. Validates API key and attempts Gemini AI background generation.
+    3. Falls back to prompt-tailored studio background if API key is invalid/unauthorized.
+    4. Composites foreground over new background.
+    """
+    # 1. Remove background to get RGBA subject
+    fg = remove_background(img)  # PIL RGBA
+    if fg.mode != 'RGBA':
+        fg = fg.convert('RGBA')
+
+    target_w, target_h = fg.size
+
+    bg = None
+    api_key = (os.environ.get('GEMINI_API_KEY') or '').strip()
+
+    # Valid Google AI Studio keys start with 'AIzaSy'
+    if api_key and api_key.startswith('AIza'):
+        try:
+            from google import genai
+            from google.genai import types
+
+            client = genai.Client(api_key=api_key)
+            result = client.models.generate_images(
+                model='imagen-3.0-generate-002',
+                prompt=f"High resolution background: {prompt}, clean aesthetic, soft studio lighting",
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio="1:1",
+                    output_mime_type="image/jpeg"
+                )
+            )
+            if result.generated_images:
+                img_bytes = result.generated_images[0].image.image_bytes
+                bg = Image.open(io.BytesIO(img_bytes)).convert('RGBA')
+        except Exception as ex:
+            print(f"[Gemini Imagen] Note: {ex}")
+    else:
+        print("[Gemini AI] Note: Key does not start with AIzaSy. Using studio background fallback.")
+
+    # Procedural prompt-tailored background fallback
+    if bg is None:
+        p_lower = prompt.lower()
+        if any(w in p_lower for w in ['sunset', 'beach', 'warm', 'sun', 'orange']):
+            c_top, c_bot = (255, 94, 98), (40, 20, 60)
+        elif any(w in p_lower for w in ['cyber', 'neon', 'city', 'tech', 'blue', 'night']):
+            c_top, c_bot = (10, 24, 48), (0, 242, 254)
+        elif any(w in p_lower for w in ['nature', 'forest', 'green', 'park', 'tree']):
+            c_top, c_bot = (15, 52, 34), (40, 116, 80)
+        elif any(w in p_lower for w in ['studio', 'white', 'clean', 'light']):
+            c_top, c_bot = (240, 242, 245), (180, 185, 195)
+        else:
+            c_top, c_bot = (20, 30, 50), (60, 40, 90)
+
+        bg = Image.new('RGBA', (target_w, target_h))
+        from PIL import ImageDraw
+        draw = ImageDraw.Draw(bg)
+        for y in range(target_h):
+            factor = y / float(target_h)
+            r = int(c_top[0] + factor * (c_bot[0] - c_top[0]))
+            g = int(c_top[1] + factor * (c_bot[1] - c_top[1]))
+            b = int(c_top[2] + factor * (c_bot[2] - c_top[2]))
+            draw.line([(0, y), (target_w, y)], fill=(r, g, b, 255))
+
+    # Resize background to match foreground
+    bg = bg.resize((target_w, target_h), Image.Resampling.LANCZOS).convert('RGBA')
+
+    # Composite foreground on top of background using alpha channel
+    bg.paste(fg, (0, 0), mask=fg.split()[3])
+    return bg.convert('RGB')
+
+
